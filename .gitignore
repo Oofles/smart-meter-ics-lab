@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# SCADA-LTS / Docker local state
+scada/data/
+scada/mysql/
+*.sqlite
+*.db
+
+# Secrets / local config
+.env
+*.local
+secrets.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build / logs / captures
+*.log
+*.pcap
+*.pcapng
+dist/
+build/
