@@ -1,0 +1,2 @@
+86fb32b4ac208304b07d7d6dfcf75dc374fcd3bc1784b4aa8986028adc73b869  opta_internal_flash.bin
+dffab0dd410657cb30c7b2fd7f2586a4792e8472e58882b3532581f8111a646d  opta_qspi_flash.bin
