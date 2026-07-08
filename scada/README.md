@@ -51,6 +51,24 @@ no conversion:
 Validate each point against the bench: `python3 scripts/mb_read.py` from the repo should
 match SCADA's live values.
 
+## Graphical view — operator page (Phase 4)
+
+Assets in `scada/assets/`: `operator-bg.png` (panel background, 900×480), and optional
+custom lamps `power-green.png` / `power-red.png`.
+
+In SCADA-LTS → **Graphical Views → add a view**:
+1. **Name** it `Smart Meter Operator View`; **upload the background** `scada/assets/operator-bg.png`.
+2. **POWER indicator** — add a **Binary graphic** → point **POWER_STATUS** → image set
+   **Leds32** (or `LightBulb`): map **1 → green**, **0 → red**. Drop it in the POWER panel.
+3. **VOLTAGE gauge** — add an **Analog graphic** → point **VOLTAGE_X10** → image set **Dial**
+   / **SmallDial**, range **0–250**. Place in the VOLTAGE panel; add a **Simple point**
+   (numeric) beneath it for the `120.0` readout.
+4. **USAGE** — add a **Simple point** → point **POWER_W** in the USAGE panel.
+5. **Save**, then open the view (Views menu) — it renders live.
+
+Verify: `python3 scripts/mb_trip.py` → indicator flips **red**, voltage & usage drop to
+**0**; `scripts/mb_reset.py` (or the I3 button / RESET coil) restores green.
+
 ## Versioning the config
 
 Use **Import/Export (Emport)** in the UI to serialize data sources + points (+ views) to
