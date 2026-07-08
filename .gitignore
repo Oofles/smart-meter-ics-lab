@@ -28,3 +28,9 @@ Thumbs.db
 *.pcapng
 dist/
 build/
+
+# Large local-only artifacts (kept on disk, not in the repo)
+# 16 MiB Opta QSPI backup (WiFi fw + FAT fs); checksum in opta/backup/README.md.
+opta/backup/opta_qspi_flash.bin
+# Vendor reference copied from the plccable USB (PDFs, samples, bundled installer).
+plccable-reference/

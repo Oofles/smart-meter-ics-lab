@@ -50,7 +50,7 @@ Opta logic: `FW_MODE==0` -> POWER_STATUS=1, VOLTAGE_X10≈1200 w/ jitter, POWER_
 
 ## Repo layout
 
-- `opta/`     — Opta PLC program (Arduino PLC IDE / IEC 61131-3) + network config
+- `opta/`     — Opta smart-meter Arduino sketch (`smart_meter/`) + factory-firmware backup (`backup/`)
 - `scada/`    — SCADA-LTS deployment (docker-compose, ARM64-adjusted) + exported view/datasource config
 - `listener/` — Pi-side update service: LoRa (serial) + Zigbee (MQTT) -> Modbus write
 - `scripts/`  — test/helper scripts (Modbus poll, trip inject, reset)
@@ -58,7 +58,9 @@ Opta logic: `FW_MODE==0` -> POWER_STATUS=1, VOLTAGE_X10≈1200 w/ jitter, POWER_
 
 ## Tech stack
 
-- Opta: Arduino PLC IDE (Windows), IEC 61131-3, Modbus TCP server, static IP.
+- Opta: **Arduino sketch** (`arduino:mbed_opta` core + ArduinoModbus), Modbus TCP server,
+  static IP, flashed over USB via `arduino-cli`. (The PLC IDE / IEC 61131-3 path was
+  abandoned — its online link would not connect on this bench; see `opta/README.md`.)
 - Pi 5: Raspberry Pi OS (64-bit / ARM64), Docker + Docker Compose.
 - SCADA-LTS: `scadalts/scadalts` image + a database container (see ARM64 note below).
 - Listener: Python 3 (pymodbus, pyserial, paho-mqtt), Zigbee2MQTT + Mosquitto.
@@ -92,8 +94,8 @@ Opta logic: `FW_MODE==0` -> POWER_STATUS=1, VOLTAGE_X10≈1200 w/ jitter, POWER_
 
 ## Status
 
-- [ ] Phase 1 — Opta smart-meter program + Modbus TCP server
-- [ ] Phase 2 — Verify Modbus from the Pi (mbpoll / pymodbus)
+- [x] Phase 1 — Opta smart-meter program + Modbus TCP server (Arduino **sketch**, not PLC IDE — see `opta/README.md`)
+- [x] Phase 2 — Verify Modbus (read + trip + reset confirmed via `mbpoll` and `scripts/mb_*.py`; run from the Pi to reconfirm)
 - [ ] Phase 3 — SCADA-LTS on the Pi (docker-compose, ARM64) + Modbus data source
 - [ ] Phase 4 — Graphical view: green/red indicator + voltage meter
 - [ ] Phase 5 — RF update listener (LoRa serial + Zigbee MQTT) -> FW_MODE write
