@@ -81,9 +81,9 @@ Opta logic: `FW_MODE==0` -> POWER_STATUS=1, VOLTAGE_X10≈1200 w/ jitter, POWER_
 
 ## Environment notes / gotchas
 
-- **ARM64 database:** the stock SCADA-LTS compose pins `mysql-server:5.7`, which has no
-  clean arm64 build. Expect to swap for an arm64 MariaDB / MySQL 8 or run the DB under
-  emulation, and pin an `scadalts` tag with an arm64 variant. Budget time here first.
+- **ARM64 database (resolved):** current `scadalts/scadalts` and `mysql/mysql-server:8.0.32`
+  are **native multi-arch (arm64)** — no emulation, no MySQL-5.7 workaround. `scada/`
+  pins those tags and runs natively on the Pi 5. (The old "budget time here" worry is moot.)
 - **Serial for LoRa:** enable the serial hardware and disable the login shell so the
   SX1262 HAT gets a clean `/dev/ttyAMA0` on the Pi 5.
 - **Zigbee is USB, not GPIO** — the LoRa HAT owns the GPIO/UART pins.
@@ -96,8 +96,8 @@ Opta logic: `FW_MODE==0` -> POWER_STATUS=1, VOLTAGE_X10≈1200 w/ jitter, POWER_
 
 - [x] Phase 1 — Opta smart-meter program + Modbus TCP server (Arduino **sketch**, not PLC IDE — see `opta/README.md`)
 - [x] Phase 2 — Verify Modbus (read + trip + reset confirmed via `mbpoll` and `scripts/mb_*.py`; run from the Pi to reconfirm)
-- [ ] Phase 3 — SCADA-LTS on the Pi (docker-compose, ARM64) + Modbus data source
-- [ ] Phase 4 — Graphical view: green/red indicator + voltage meter
+- [x] Phase 3 — SCADA-LTS on the Pi (Docker, native arm64) + Modbus data source (5 points, verified vs `mb_read.py`; attack→reset reflected in SCADA)
+- [ ] Phase 4 — Graphical view: green/red indicator + voltage meter (data points live; graphic/images remain)
 - [ ] Phase 5 — RF update listener (LoRa serial + Zigbee MQTT) -> FW_MODE write
 - [ ] Phase 6 — End-to-end trip + reset, then real RF delivery
 
