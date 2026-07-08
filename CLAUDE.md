@@ -90,14 +90,16 @@ Opta logic: `FW_MODE==0` -> POWER_STATUS=1, VOLTAGE_X10≈1200 w/ jitter, POWER_
 - **Solo testing:** full over-the-air delivery needs a second LoRa node / Zigbee source.
   Until then, validate the trip chain by injecting the payload locally (publish the MQTT
   message by hand, or feed the LoRa parser a canned frame), then wire real RF last.
-- SCADA-LTS default login is admin/admin — change it.
+- SCADA-LTS login is **intentionally left `admin/admin`** for this exercise — a planted
+  default-credential weakness for the defenders to discover and flag. (Change it only if this
+  rig ever leaves the isolated lab.)
 
 ## Status
 
 - [x] Phase 1 — Opta smart-meter program + Modbus TCP server (Arduino **sketch**, not PLC IDE — see `opta/README.md`)
 - [x] Phase 2 — Verify Modbus (read + trip + reset confirmed via `mbpoll` and `scripts/mb_*.py`; run from the Pi to reconfirm)
 - [x] Phase 3 — SCADA-LTS on the Pi (Docker, native arm64) + Modbus data source (5 points, verified vs `mb_read.py`; attack→reset reflected in SCADA)
-- [ ] Phase 4 — Graphical view: green/red indicator + voltage meter (data points live; graphic/images remain)
+- [x] Phase 4 — Graphical operator view (green/red indicator + voltage gauge + usage); attack/reset reflected live in SCADA
 - [ ] Phase 5 — RF update listener (LoRa serial + Zigbee MQTT) -> FW_MODE write
 - [ ] Phase 6 — End-to-end trip + reset, then real RF delivery
 

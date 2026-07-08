@@ -29,8 +29,9 @@ the app answers at:
 http://<pi-ip>:8080/Scada-LTS          # note the /Scada-LTS path, not bare :8080
 ```
 
-Default login **admin / admin** — **change it immediately** (top-right user → Users → edit
-`admin` → new password).
+Default login **admin / admin** — for this exercise it is **intentionally left as-is** (a
+planted default-credential weakness for the defenders to discover). Change it (top-right user
+→ Users → edit `admin`) only if this rig ever leaves the isolated lab.
 
 ## Modbus data source + points (Phase 3)
 
