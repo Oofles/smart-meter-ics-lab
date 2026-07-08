@@ -1,0 +1,58 @@
+# SCADA-LTS for the smart-meter rig — Raspberry Pi 5 (ARM64).
+#
+# Both images are native multi-arch (arm64), so NO emulation and NO MySQL 5.7
+# workaround are needed (that CLAUDE.md note is outdated). The app's DB connection
+# is baked into its context.xml, which dials service host `database`, user/pass
+# root/root, schema `scadalts` — so those names are load-bear, don't rename them.
+#
+# First boot builds the schema automatically (~5 min). App URL (note the path):
+#   http://<pi-ip>:8080/Scada-LTS      default login admin/admin (change it!)
+services:
+  database:
+    container_name: scadalts-db
+    image: mysql/mysql-server:8.0.32          # arm64 confirmed
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=root
+      - MYSQL_DATABASE=scadalts
+      - TZ=America/New_York
+    expose:
+      - "3306"
+    volumes:
+      - db_data:/var/lib/mysql:rw
+    command: --log_bin_trust_function_creators=1   # required: app installs stored fns on first boot
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  scadalts:
+    container_name: scadalts-app
+    image: scadalts/scadalts:release-2.8.1        # pinned; not :latest
+    restart: unless-stopped
+    environment:
+      - CATALINA_OPTS=-Xmx1G -Xms1G               # Pi-sized heap (raise to 2G only on an 8GB Pi)
+      - TZ=America/New_York
+    ports:
+      - "8080:8080"
+    depends_on:
+      database:
+        condition: service_healthy
+    volumes:
+      - tomcat_log:/usr/local/tomcat/logs:rw
+    command:
+      - /usr/bin/wait-for-it
+      - --host=database
+      - --port=3306
+      - --timeout=60
+      - --strict
+      - --
+      - /usr/local/tomcat/bin/catalina.sh
+      - run
+
+volumes:
+  db_data:
+  tomcat_log:
