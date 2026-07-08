@@ -1,0 +1,4 @@
+# The 16 MiB QSPI image is kept locally but not committed (repo bloat).
+# It is mostly stock WiFi firmware + FAT filesystem, identical across Opta units.
+# Its SHA-256 is recorded in SHA256SUMS.txt / README.md. Use Git LFS if you want it tracked.
+opta_qspi_flash.bin
