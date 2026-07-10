@@ -1,17 +1,24 @@
-"""'Firmware update' frame for the smart-meter RF update channel.
+"""'Firmware update' frame for the smart-meter LoRa mesh update channel.
 
-Deliberately firmware-shaped (magic + version + type + CRC16) so the exercise
-teaches integrity/authenticity: the listener 'validates' the CRC, but the RF
-channel is unauthenticated — anyone can forge a valid-looking malicious update.
-See docs/register-map.md (FW_MODE) and CLAUDE.md.
+Firmware-shaped (magic + version + type + msg_id + ttl + CRC16) so the exercise
+teaches integrity/authenticity — the listener 'validates' the CRC, but the RF
+channel is unauthenticated, so anyone can forge a valid-looking malicious update.
 
-Frame (8 bytes):  b"SMFW" | version(1) | type(1) | crc16-ccitt(2, big-endian)
+The msg_id + ttl fields turn the raw LoRa broadcast into an application-layer
+FLOOD MESH: an update injected at one node (the "drone" near a meter) is
+rebroadcast hop-by-hop to every reachable meter (see listener.py). `msg_id` dedups
+so a frame is acted on / relayed once; `ttl` bounds the hop count. Runs on the
+existing UART SX1262 HATs (transparent/broadcast mode) — no Meshtastic needed.
+
+Frame (11 bytes):
+  b"SMFW" | version(1) | type(1) | msg_id(2 BE) | ttl(1) | crc16-ccitt(2 BE)
 """
 import struct
 
 MAGIC = b"SMFW"
 TYPE_BENIGN = 0x00      # normal firmware / version heartbeat
 TYPE_MALICIOUS = 0x01   # the "malicious firmware update"
+FRAME_LEN = 11
 
 
 def crc16(data: bytes) -> int:
@@ -23,17 +30,19 @@ def crc16(data: bytes) -> int:
     return crc
 
 
-def build(fw_type: int, version: int = 1) -> bytes:
-    body = MAGIC + bytes([version & 0xFF, fw_type & 0xFF])
+def build(fw_type: int, msg_id: int, ttl: int = 3, version: int = 1) -> bytes:
+    body = (MAGIC + bytes([version & 0xFF, fw_type & 0xFF])
+            + struct.pack(">H", msg_id & 0xFFFF) + bytes([ttl & 0xFF]))
     return body + struct.pack(">H", crc16(body))
 
 
-def parse(frame: bytes):
-    """-> (valid, fw_type, version). valid=False on bad magic or failed CRC."""
+def parse(frame: bytes) -> dict:
+    """-> {valid, version, fw_type, msg_id, ttl}. valid=False on bad magic/CRC/len."""
     frame = frame.rstrip(b"\r\n")
-    if len(frame) < 8 or frame[:4] != MAGIC:
-        return (False, None, None)
-    body, chk = frame[:6], frame[6:8]
+    if len(frame) < FRAME_LEN or frame[:4] != MAGIC:
+        return {"valid": False}
+    body, chk = frame[:FRAME_LEN - 2], frame[FRAME_LEN - 2:FRAME_LEN]
     if struct.unpack(">H", chk)[0] != crc16(body):
-        return (False, None, None)
-    return (True, frame[5], frame[4])
+        return {"valid": False}
+    return {"valid": True, "version": frame[4], "fw_type": frame[5],
+            "msg_id": struct.unpack(">H", frame[6:8])[0], "ttl": frame[8]}
