@@ -13,9 +13,8 @@ and a **firmware-update-over-RF** attack path, for use in a hands-on cyber exerc
 - An **Arduino Opta PLC** runs a smart-meter simulation and serves **Modbus TCP**.
 - A **Raspberry Pi 5** (Pironman 5 case) hosts **SCADA-LTS**, which polls the Opta and
   renders an operator view: a green/red power indicator and a live voltage/usage meter.
-- A **LoRa HAT** (Waveshare SX1262) and a **Zigbee USB coordinator** (Sonoff ZBDongle-P)
-  on the Pi are the simulated update channel. A payload delivered over that channel is
-  the exploited path in the scenario.
+- A **LoRa HAT** (Waveshare SX1262) on the Pi is the simulated update channel. A payload
+  delivered over that channel is the exploited path in the scenario.
 - The scenario outcome: the "malicious firmware update" flips the meter to a fault
   state — indicator goes **red**, voltage/usage drop to **zero**.
 
@@ -25,7 +24,7 @@ write against a simulated meter — there is no real infrastructure and no weapo
 ## Architecture (data flow)
 
 ```
-[2nd LoRa node / Zigbee device]  --RF payload-->  [Pi: update listener]
+[2nd LoRa node]  --------RF payload-------->  [Pi: update listener]
                                                         | writes FW_MODE (Modbus)
                                                         v
 [Opta PLC: smart-meter sim + Modbus TCP server]  <---- polls ----  [Pi: SCADA-LTS view]
@@ -52,7 +51,7 @@ Opta logic: `FW_MODE==0` -> POWER_STATUS=1, VOLTAGE_X10≈1200 w/ jitter, POWER_
 
 - `opta/`     — Opta smart-meter Arduino sketch (`smart_meter/`) + factory-firmware backup (`backup/`)
 - `scada/`    — SCADA-LTS deployment (docker-compose, ARM64-adjusted) + exported view/datasource config
-- `listener/` — Pi-side update service: LoRa (serial) + Zigbee (MQTT) -> Modbus write
+- `listener/` — Pi-side update service: LoRa (serial) -> Modbus write
 - `scripts/`  — test/helper scripts (Modbus poll, trip inject, reset)
 - `docs/`     — `register-map.md` (contract), `architecture.md`
 
@@ -63,12 +62,12 @@ Opta logic: `FW_MODE==0` -> POWER_STATUS=1, VOLTAGE_X10≈1200 w/ jitter, POWER_
   abandoned — its online link would not connect on this bench; see `opta/README.md`.)
 - Pi 5: Raspberry Pi OS (64-bit / ARM64), Docker + Docker Compose.
 - SCADA-LTS: `scadalts/scadalts` image + a database container (see ARM64 note below).
-- Listener: Python 3 (pymodbus, pyserial, paho-mqtt), Zigbee2MQTT + Mosquitto.
+- Listener: Python 3 (pyserial + the dependency-free `scripts/mb.py` Modbus client).
 
 ## Rules
 
 - **IMPORTANT: model "modified firmware" as the `FW_MODE` register, not a real reflash.**
-  The Opta has no OTA path over LoRa/Zigbee; the radios are on the Pi. The update
+  The Opta has no OTA path over LoRa; the radio is on the Pi. The update
   listener writes `FW_MODE` to change Opta behavior. Never attempt to reflash the Opta
   over RF — it is unreliable and defeats the demo.
 - Treat `docs/register-map.md` as the single source of truth. Any addressing change
@@ -86,10 +85,9 @@ Opta logic: `FW_MODE==0` -> POWER_STATUS=1, VOLTAGE_X10≈1200 w/ jitter, POWER_
   pins those tags and runs natively on the Pi 5. (The old "budget time here" worry is moot.)
 - **Serial for LoRa:** enable the serial hardware and disable the login shell so the
   SX1262 HAT gets a clean `/dev/ttyAMA0` on the Pi 5.
-- **Zigbee is USB, not GPIO** — the LoRa HAT owns the GPIO/UART pins.
-- **Solo testing:** full over-the-air delivery needs a second LoRa node / Zigbee source.
-  Until then, validate the trip chain by injecting the payload locally (publish the MQTT
-  message by hand, or feed the LoRa parser a canned frame), then wire real RF last.
+- **Solo testing:** full over-the-air delivery needs a second LoRa node. Until then,
+  validate the trip chain by feeding the listener a canned frame (`listener.py --simulate`),
+  then wire real RF last.
 - SCADA-LTS login is **intentionally left `admin/admin`** for this exercise — a planted
   default-credential weakness for the defenders to discover and flag. (Change it only if this
   rig ever leaves the isolated lab.)
@@ -100,7 +98,7 @@ Opta logic: `FW_MODE==0` -> POWER_STATUS=1, VOLTAGE_X10≈1200 w/ jitter, POWER_
 - [x] Phase 2 — Verify Modbus (read + trip + reset confirmed via `mbpoll` and `scripts/mb_*.py`; run from the Pi to reconfirm)
 - [x] Phase 3 — SCADA-LTS on the Pi (Docker, native arm64) + Modbus data source (5 points, verified vs `mb_read.py`; attack→reset reflected in SCADA)
 - [x] Phase 4 — Graphical operator view (green/red indicator + voltage gauge + usage); attack/reset reflected live in SCADA
-- [~] Phase 5 — RF update listener: **LoRa half built + validated** (`listener/`: SX1262 868M UART HAT alive + TX on the Pi; malicious frame → `FW_MODE=1` trip proven via `--simulate`). Remaining: real OTA (needs a 2nd SX1262 node) + Zigbee transport (needs Zigbee2MQTT; Pi offline on the isolated switch)
+- [~] Phase 5 — RF update listener: **LoRa half built + validated** (`listener/`: SX1262 868M UART HAT alive + TX on the Pi; malicious frame → `FW_MODE=1` trip proven via `--simulate`). Remaining: real over-the-air (needs a 2nd LoRa node)
 - [ ] Phase 6 — End-to-end trip + reset, then real RF delivery
 
 Update this checklist as phases land.

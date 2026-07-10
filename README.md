@@ -2,8 +2,8 @@
 
 A single-bench ICS security training rig: an Arduino Opta PLC simulates a residential
 **smart meter** and serves Modbus TCP; a Raspberry Pi 5 hosts a **SCADA-LTS** operator
-view (green/red power indicator + live voltage/usage meter); a LoRa + Zigbee update
-channel on the Pi is the simulated, exploited **firmware-update-over-RF** path. The
+view (green/red power indicator + live voltage/usage meter); a LoRa update channel on
+the Pi is the simulated, exploited **firmware-update-over-RF** path. The
 scenario outcome: a "malicious firmware update" trips the meter to a fault state —
 indicator red, voltage/usage to zero.
 
@@ -15,16 +15,15 @@ code.
 
 - **Opta PLC** — smart-meter simulation, Modbus TCP server, HMI board (+ optional buzzer)
 - **Raspberry Pi 5** (Pironman 5) — hosts SCADA-LTS + the RF update listener
-- **Waveshare SX1262 LoRa HAT** — long-range RF update channel
-- **Sonoff ZBDongle-P** (USB) — Zigbee update channel via Zigbee2MQTT
+- **Waveshare SX1262 868M LoRa HAT** (UART) — the RF update channel
 
 ## Layout
 
 | Path         | Contents                                                          |
 |--------------|------------------------------------------------------------------|
-| `opta/`      | Opta PLC program (IEC 61131-3) + network config                  |
+| `opta/`      | Opta smart-meter Arduino sketch + factory-firmware backup        |
 | `scada/`     | SCADA-LTS docker-compose (ARM64) + exported view/datasource      |
-| `listener/`  | Pi-side LoRa+Zigbee update service -> Modbus write               |
+| `listener/`  | Pi-side LoRa update listener -> Modbus write                     |
 | `scripts/`   | Modbus poll / trip / reset helpers                               |
 | `docs/`      | `register-map.md` (the contract), `architecture.md`              |
 | `CLAUDE.md`  | Claude Code project memory                                       |
@@ -39,7 +38,7 @@ code.
 ## Data flow
 
 ```
-[2nd LoRa node / Zigbee device] --RF payload--> [Pi: update listener]
+[2nd LoRa node] --------RF payload--------> [Pi: update listener]
                                                      | writes FW_MODE (Modbus)
                                                      v
 [Opta: smart-meter sim + Modbus TCP] <-- polls -- [Pi: SCADA-LTS view]

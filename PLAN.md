@@ -58,24 +58,22 @@ Build the view SCADA-LTS hosts:
 
 ## Phase 5 — RF update listener
 
-One Pi-side service listening on both transports; on a recognized malicious update it
-writes `FW_MODE = 1` via Modbus. Benign updates/heartbeats write 0 (or no-op).
+One Pi-side service; on a recognized malicious update it writes `FW_MODE = 1` via Modbus.
+Benign updates/heartbeats write 0 (or no-op).
 
-- LoRa: read the SX1262 HAT on `/dev/ttyAMA0` (enable serial hardware, disable login shell).
-- Zigbee: Sonoff dongle -> Zigbee2MQTT -> subscribe to the topic.
+- LoRa: read the SX1262 HAT on `/dev/serial0` (enable serial hardware, disable login shell).
 - Optionally give the payload a firmware-like shape (magic bytes, version header,
   checksum the listener "validates") to sharpen the integrity lesson.
 
-- Deliverable: `listener/` service (Python: pymodbus, pyserial, paho-mqtt), config,
+- Deliverable: `listener/` service (Python: pyserial + the dependency-free `scripts/mb.py`),
   `listener/README.md`.
 - Done when: injecting a malicious payload flips SCADA to red and zero.
 
 ## Phase 6 — End-to-end trip + reset, then real RF
 
 - Bind RESET to a button/script to re-arm between runs.
-- Solo testing: inject the payload locally first (hand-publish MQTT / canned LoRa frame)
-  to prove the chain, then wire real over-the-air delivery with a second LoRa node /
-  Zigbee source.
+- Solo testing: feed the listener a canned frame first (`listener.py --simulate`) to prove
+  the chain, then wire real over-the-air delivery with a second LoRa node.
 
 - Done when: the full normal -> attack -> reset loop runs on demand.
 

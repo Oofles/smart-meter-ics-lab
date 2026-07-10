@@ -10,16 +10,16 @@
    the hosted page: a green/red indicator (POWER_STATUS) and a voltage/usage meter
    (VOLTAGE_X10, POWER_W).
 
-3. **RF update channel (the attack surface).** A LoRa HAT (serial) and a Zigbee USB
-   coordinator (via Zigbee2MQTT) feed a Pi-side listener. The listener treats inbound
-   payloads as "firmware updates" and writes FW_MODE accordingly.
+3. **RF update channel (the attack surface).** A LoRa HAT (serial) feeds a Pi-side
+   listener. The listener treats inbound payloads as "firmware updates" and writes
+   FW_MODE accordingly.
 
 ## Kill chain (normal -> attack -> reset)
 
 1. **Normal.** Opta: FW_MODE=0 -> POWER_STATUS=1, voltage ~120 V with jitter, usage
    walking. SCADA view: green light, meter alive.
-2. **Delivery.** Attacker transmits a malicious "firmware update" over LoRa or Zigbee.
-   Same channel also carries benign version heartbeats — the point is that the channel
+2. **Delivery.** Attacker transmits a malicious "firmware update" over LoRa. The same
+   channel also carries benign version heartbeats — the point is that the channel
    is unauthenticated, not that traffic is inherently bad.
 3. **Apply.** Listener decodes the payload, "applies the update," writes FW_MODE=1.
 4. **Effect.** Opta latches fault: POWER_STATUS=0, voltage/usage=0 (optional buzzer/HMI red).
@@ -29,7 +29,7 @@
 ## Design decisions
 
 - **"Modified firmware" = a mode register, not a reflash.** The Opta has no OTA path
-  over LoRa/Zigbee and the radios live on the Pi. Modeling the update as FW_MODE keeps
+  over LoRa and the radio lives on the Pi. Modeling the update as FW_MODE keeps
   the demo reliable and re-runnable while staying faithful to the lesson: an update
   channel with write access to OT can change physical process state.
 - **Trip logic lives on the Opta.** The listener only sets FW_MODE; the Opta decides

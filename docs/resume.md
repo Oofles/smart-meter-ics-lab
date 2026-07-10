@@ -40,10 +40,8 @@ When the network differs, the network-dependent knobs are:
    (`python3 scripts/mb_read.py <ip>`) or edit the default.
 5. **SCADA URL** — `http://<pi-ip>:8080/Scada-LTS` (login `admin/admin`, left intentionally).
 
-## Resume point — Phase 5 (RF listener)
+## Resume point — Phase 5 / 6
 
-1. Enable the Pi serial for the SX1262 LoRa HAT (serial hardware on, login console off → clean
-   `/dev/ttyAMA0`); reboot. 2. Detect the LoRa HAT + Sonoff Zigbee dongle. 3. Zigbee2MQTT +
-   Mosquitto. 4. `listener/` service (pyserial + paho-mqtt) → benign heartbeat normally, and on
-   a recognized malicious payload write `FW_MODE=1` (reuse `scripts/mb.py`). 5. Test locally
-   (hand-published MQTT / canned LoRa frame) before wiring real RF.
+Phase 5 **LoRa listener is built + validated** (`listener/`, SX1262 868M UART HAT). Remaining:
+real over-the-air (needs a 2nd SX1262 node), then Phase 6 (full end-to-end). **Zigbee has been
+dropped from the plan** — LoRa only. (Meshtastic as the mesh transport is under evaluation.)

@@ -42,6 +42,5 @@ parse → Modbus write end to end (watch it trip via `scripts/mb_read.py` / SCAD
 
 ## TODO
 
-- Zigbee transport (Sonoff dongle → Zigbee2MQTT → MQTT topic → same `handle()`).
-  Deferred: needs Zigbee2MQTT installed (Pi is offline on the isolated switch).
+- Real over-the-air: a 2nd SX1262 node to transmit the frame (solo-testing limit).
 - Optional benign heartbeat transmitter so normal-state RF is benign-but-present.
