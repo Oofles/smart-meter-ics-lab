@@ -100,7 +100,7 @@ Opta logic: `FW_MODE==0` -> POWER_STATUS=1, VOLTAGE_X10≈1200 w/ jitter, POWER_
 - [x] Phase 2 — Verify Modbus (read + trip + reset confirmed via `mbpoll` and `scripts/mb_*.py`; run from the Pi to reconfirm)
 - [x] Phase 3 — SCADA-LTS on the Pi (Docker, native arm64) + Modbus data source (5 points, verified vs `mb_read.py`; attack→reset reflected in SCADA)
 - [x] Phase 4 — Graphical operator view (green/red indicator + voltage gauge + usage); attack/reset reflected live in SCADA
-- [ ] Phase 5 — RF update listener (LoRa serial + Zigbee MQTT) -> FW_MODE write
+- [~] Phase 5 — RF update listener: **LoRa half built + validated** (`listener/`: SX1262 868M UART HAT alive + TX on the Pi; malicious frame → `FW_MODE=1` trip proven via `--simulate`). Remaining: real OTA (needs a 2nd SX1262 node) + Zigbee transport (needs Zigbee2MQTT; Pi offline on the isolated switch)
 - [ ] Phase 6 — End-to-end trip + reset, then real RF delivery
 
 Update this checklist as phases land.
