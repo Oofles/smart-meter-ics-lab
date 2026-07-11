@@ -14,7 +14,6 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/.." && pwd)"
 RUN_USER="${SUDO_USER:-$USER}"
 HOME_DIR="$(getent passwd "$RUN_USER" | cut -d: -f6)"
-GW="192.168.1.1"
 
 KIT="${1:-}"
 [[ "$KIT" =~ ^[0-9]+$ ]] && [ "$KIT" -ge 1 ] && [ "$KIT" -le 99 ] || {
@@ -46,7 +45,11 @@ phase_net() {
   echo "== net: static wired IP $PI_IP/24 (kit $KIT) =="
   local CON; CON="$(nmcli -t -f NAME,TYPE con show | awk -F: '$2=="802-3-ethernet"{print $1; exit}')"
   [ -n "${CON:-}" ] || { echo "   no wired NetworkManager connection found — set static IP manually"; return; }
-  sudo nmcli con mod "$CON" ipv4.addresses "$PI_IP/24" ipv4.gateway "$GW" ipv4.method manual
+  # No gateway on the isolated switch (no router at .1) and never-default so eth0 does NOT
+  # install a default route — otherwise it outranks WiFi and kills internet during setup
+  # (DNS/docker pulls would go out the dead switch link). WiFi stays the only default route.
+  sudo nmcli con mod "$CON" ipv4.addresses "$PI_IP/24" ipv4.method manual \
+       ipv4.gateway "" ipv4.never-default yes
   sudo nmcli con up "$CON" || true
   echo "   wired IP set (WiFi left on DHCP for internet). Reach this kit at $PI_IP on the switch."
 }
