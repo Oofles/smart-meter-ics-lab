@@ -1,10 +1,20 @@
 # PROVISION.md — standing up kits (1 → 45)
 
-Replication model: **isolated identical islands**. Every kit is a byte-identical clone —
-same static IPs (Pi `192.168.1.94`, Opta `192.168.1.210`), same HAT config, same firmware.
-Kits never share an Ethernet segment; the only thing that crosses between them is **LoRa RF**
-(the attack channel). Identical addressing is safe *because* the islands are electrically
-separate, and it's what makes cloning trivial.
+Replication model: **isolated islands, per-kit-addressed Pis.** Kits never share an
+Ethernet segment during the exercise; the only thing that crosses between them is **LoRa RF**
+(the attack channel). Each kit is provisioned by a single **kit-number** argument.
+
+## Addressing
+
+| Device | IP | Notes |
+|--------|-----|-------|
+| Pi (wired/switch) | `192.168.1.(100 + kit)` | kit 9 → `.109`. Unique per kit → SSH/troubleshoot each kit distinctly. |
+| Opta | `192.168.1.210` | **Same on every kit** — local to each switch; the Pi talks to *its own* Opta. Keeps one firmware artifact. |
+| Pi (WiFi) | DHCP | Internet for setup only; disconnected/unused during the exercise. |
+
+Because every Opta is `.210`, **don't bridge the OT switches together** (they'd collide). Reach
+each **Pi** at its unique `.10x` when you plug into that kit's switch. If you ever need
+centrally-addressable Optas, that requires per-kit Opta firmware — not done today.
 
 ## Per-kit hardware
 
@@ -14,37 +24,49 @@ separate, and it's what makes cloning trivial.
 - Arduino Opta **connected to the Pi by USB** (this is what lets the Pi flash it).
 - 12–24 V trainer supply for the Opta (relays only switch on that supply; Modbus logic runs
   without it).
-- 5-port switch: Pi + Opta both on it (that's the kit's OT LAN). **No uplink to other kits.**
+- 5-port switch: Pi + Opta both on it (the kit's OT LAN). **No uplink to other kits.**
 
 ## Two-stage replication
 
-**Stage 1 — build ONE golden kit** (do this once, on the reference Pi):
+**Stage 1 — build ONE golden kit** (once, on a reference Pi with internet over WiFi):
 
 ```bash
 git clone <repo> ~/smart-meter-ics-lab && cd ~/smart-meter-ics-lab
-sudo provision/provision.sh          # deps, UART, static IP, SCADA, listener svc, HAT, Opta
-sudo reboot                          # UART change needs it; re-run 'provision.sh verify' after
+sudo provision/provision.sh <kit-number>     # e.g. 2  -> Pi .102; all phases
+sudo reboot                                  # UART change needs it; then 'provision.sh <n> verify'
 ```
 
-`provision.sh` is **phased** — run one at a time while validating a fresh kit:
-`sudo provision/provision.sh system serial net`, then `scada`, `service`, `hw`, `verify`.
+`provision.sh <kit> [phase ...]` is **phased** — validate a fresh kit a step at a time:
+`sudo provision/provision.sh 2 system serial net ssh`, then `scada`, `service`, `hw`, `verify`.
+Phases: `system serial net ssh scada service hw verify`.
 
-When it verifies clean, power down and image the SD card (on another machine):
+When it verifies clean, power down and image the SD (on another machine):
 
 ```bash
 sudo dd if=/dev/sdX of=golden-kit.img bs=4M status=progress   # then shrink with pishrink
 ```
 
-**Stage 2 — clone the other 44:** write `golden-kit.img` to each SD, boot the kit, then:
+**Stage 2 — clone the other 44:** write `golden-kit.img` to each SD, boot the kit, then run
+`kit_init.sh` **with that kit's number**:
 
 ```bash
-cd ~/smart-meter-ics-lab && sudo provision/kit_init.sh
+cd ~/smart-meter-ics-lab && sudo provision/kit_init.sh 9      # kit 9 -> Pi .109
 ```
 
-`kit_init.sh` does only the two things that live in the *physical* hardware and therefore
-can't be baked into the image: **configure this kit's HAT NVM** and **flash this kit's Opta**,
-then verify. ~1–2 min per kit. Everything else (SCADA + config, listener service, IP, UART)
-rode along in the image.
+`kit_init.sh <kit>` applies only the per-kit bits (`net ssh hw verify`): this kit's IP + SSH
+keys, this HAT's NVM config, and this Opta's firmware, then verifies. ~1–2 min per kit.
+Everything slow (SCADA + config, listener service, UART, packages) rode along in the image.
+
+## SSH / management
+
+`provision.sh` enables `ssh` and installs the public keys in **`provision/authorized_keys`**
+(version-controlled) for every kit — so any kit is reachable from a management laptop with a
+listed key. This is deliberate for the isolated lab (same spirit as the planted `admin/admin`
+SCADA cred); don't ship it outside the lab. Add facilitator keys to that file before imaging.
+
+> Bootstrapping the *first* kit: enable SSH once by hand (`sudo raspi-config nonint do_ssh 0`
+> + drop your key in `~/.ssh/authorized_keys`) so you can get in to run `provision.sh`; from
+> then on the golden image carries SSH + keys forward automatically.
 
 ## The building blocks (all in `provision/`)
 
@@ -52,8 +74,9 @@ rode along in the image.
 |--------|------|-------|
 | `hat_config.py` | Writes the HAT to the golden config (ch 18 / 868.125 MHz, air-rate 2.4k, transparent) + verifies | `--read` to inspect only. Validated on the reference kit. |
 | `opta_flash.sh` | Flashes `opta/firmware/smart_meter.ino.bin` from the Pi via `dfu-util` (1200-baud touch → DFU → write 0x08040000) | No Arduino toolchain on the Pi; Opta must be on Pi USB. |
-| `kit_init.sh` | HAT + Opta + verify (per clone) | |
-| `provision.sh` | Full golden-kit build (phased) | Run once; validate on kit 2. |
+| `kit_init.sh <kit>` | Per-clone: net + ssh + HAT + Opta + verify | thin wrapper over `provision.sh` phases |
+| `provision.sh <kit> [phase]` | Full/partial kit build, phased | Run once for the golden kit; validate on kit 2. |
+| `authorized_keys` | Management SSH public keys installed on every kit | add facilitator keys here |
 
 The Opta firmware artifact `opta/firmware/smart_meter.ino.bin` is rebuilt from
 `opta/smart_meter/` with `arduino-cli` (see `opta/README.md`) whenever the sketch changes —
@@ -64,7 +87,7 @@ regenerate + re-image after any Opta change.
 ```bash
 python3 provision/hat_config.py --read     # HAT: 00 00 00 62 00 12 03 00 00
 python3 scripts/mb_read.py                 # Opta: healthy, dial voltage, panel state
-# SCADA: http://192.168.1.94:8080/Scada-LTS  (admin/admin — intentional planted cred)
+# SCADA: http://192.168.1.<100+kit>:8080/Scada-LTS  (admin/admin — intentional planted cred)
 ```
 
 ## RF at scale (single shared channel — "one shot trips everyone")

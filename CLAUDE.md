@@ -62,8 +62,10 @@ VOLTAGE_X10=0, POWER_W=0, **O1/O2/O3 off, O4 red on**. `RESET`=1 (coil or I3 but
 - `scripts/`  — test/helper scripts (Modbus poll, trip inject, reset)
 - `docs/`     — `register-map.md` (contract), `architecture.md`
 
-Kit replication (1 -> 45): **isolated identical islands** — see `PROVISION.md`. Golden SD image
-+ per-clone `kit_init.sh` (configures that HAT, flashes that Opta). RF is the only cross-kit link.
+Kit replication (1 -> 45): **isolated islands, per-kit-addressed Pis** — see `PROVISION.md`.
+Golden SD image + per-clone `sudo provision/kit_init.sh <kit#>` (sets Pi IP `192.168.1.(100+kit)`,
+installs SSH keys, configures that HAT, flashes that Opta). Opta stays `.210` on every kit
+(single firmware). RF is the only cross-kit link; don't bridge the OT switches.
 
 ## Tech stack
 

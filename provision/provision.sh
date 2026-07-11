@@ -1,22 +1,31 @@
 #!/usr/bin/env bash
-# provision.sh — build ONE golden kit from a baseline Raspberry Pi OS (Bookworm, 64-bit).
-# Run this once on the reference Pi, verify, then image its SD card and clone to the rest
-# (clones only need provision/kit_init.sh — see PROVISION.md).
+# provision.sh — build/provision a kit from a baseline Raspberry Pi OS (Bookworm, 64-bit).
 #
-# Assumes: internet available; Waveshare SX1262 HAT seated; Opta connected by USB; Pi + Opta
-# on the kit's switch. Run from the repo root:  sudo provision/provision.sh [phase]
-# Phases (default runs all in order): system serial net scada service hw verify
+# Usage:  sudo provision/provision.sh <kit-number> [phase ...]
+#   <kit-number>  1..99 — sets this Pi's wired IP to 192.168.1.(100+kit)  (kit 9 -> .109)
+#   phases (default all, in order): system serial net ssh scada service hw verify
+#
+# The Opta stays 192.168.1.210 on every kit (single firmware; the Pi talks to its own Opta
+# locally). Kits are isolated islands — don't bridge the OT switches (all Optas share .210).
+# Assumes: internet (WiFi) available; Waveshare HAT seated; Opta on Pi USB.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/.." && pwd)"
 RUN_USER="${SUDO_USER:-$USER}"
-PI_IP="192.168.1.94/24"; GW="192.168.1.1"
+HOME_DIR="$(getent passwd "$RUN_USER" | cut -d: -f6)"
+GW="192.168.1.1"
+
+KIT="${1:-}"
+[[ "$KIT" =~ ^[0-9]+$ ]] && [ "$KIT" -ge 1 ] && [ "$KIT" -le 99 ] || {
+  echo "usage: sudo provision/provision.sh <kit-number 1..99> [phase ...]" >&2; exit 2; }
+shift
+PI_IP="192.168.1.$((100 + KIT))"
 
 phase_system() {
   echo "== system: packages =="
   sudo apt-get update
-  sudo apt-get install -y dfu-util python3-serial python3-lgpio git curl
+  sudo apt-get install -y dfu-util python3-serial python3-lgpio git curl openssh-server
   if ! command -v docker >/dev/null; then
     echo "== installing docker =="
     curl -fsSL https://get.docker.com | sudo sh
@@ -32,11 +41,27 @@ phase_serial() {
 }
 
 phase_net() {
-  echo "== net: static IP $PI_IP on the wired connection =="
+  echo "== net: static wired IP $PI_IP/24 (kit $KIT) =="
   local CON; CON="$(nmcli -t -f NAME,TYPE con show | awk -F: '$2=="802-3-ethernet"{print $1; exit}')"
-  [ -n "${CON:-}" ] || { echo "   no wired NM connection found — set static IP manually"; return; }
-  sudo nmcli con mod "$CON" ipv4.addresses "$PI_IP" ipv4.gateway "$GW" ipv4.method manual
+  [ -n "${CON:-}" ] || { echo "   no wired NetworkManager connection found — set static IP manually"; return; }
+  sudo nmcli con mod "$CON" ipv4.addresses "$PI_IP/24" ipv4.gateway "$GW" ipv4.method manual
   sudo nmcli con up "$CON" || true
+  echo "   wired IP set (WiFi left on DHCP for internet). Reach this kit at $PI_IP on the switch."
+}
+
+phase_ssh() {
+  echo "== ssh: enable server + install management keys =="
+  sudo systemctl enable --now ssh
+  install -d -m 700 -o "$RUN_USER" -g "$RUN_USER" "$HOME_DIR/.ssh"
+  sudo touch "$HOME_DIR/.ssh/authorized_keys"
+  while IFS= read -r k; do
+    [ -z "$k" ] && continue
+    case "$k" in \#*) continue ;; esac
+    sudo grep -qF "$k" "$HOME_DIR/.ssh/authorized_keys" || echo "$k" | sudo tee -a "$HOME_DIR/.ssh/authorized_keys" >/dev/null
+  done < "$HERE/authorized_keys"
+  sudo chmod 600 "$HOME_DIR/.ssh/authorized_keys"
+  sudo chown -R "$RUN_USER:$RUN_USER" "$HOME_DIR/.ssh"
+  echo "   ssh up; keys from provision/authorized_keys installed for $RUN_USER"
 }
 
 phase_scada() {
@@ -81,12 +106,12 @@ phase_hw() {
 }
 
 phase_verify() {
-  echo "== verify =="
+  echo "== verify (kit $KIT, Pi $PI_IP) =="
   python3 "$HERE/hat_config.py" --read
   sleep 6
   python3 "$REPO/scripts/mb_read.py" || echo "   (Opta not answering — check USB/Ethernet)"
 }
 
-PHASES="${*:-system serial net scada service hw verify}"
+PHASES="${*:-system serial net ssh scada service hw verify}"
 for p in $PHASES; do "phase_$p"; done
-echo "provision: phases [$PHASES] complete."
+echo "provision: kit $KIT, phases [$PHASES] complete."

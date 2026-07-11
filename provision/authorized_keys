@@ -1,0 +1,5 @@
+# Management SSH public keys installed on every kit by provision.sh (ssh phase).
+# Public keys only — safe to commit. Add facilitator keys here, one per line.
+# (Enabling SSH + a shared management key is deliberate for this ISOLATED lab, same
+#  spirit as the planted admin/admin SCADA cred. Don't ship this outside the lab.)
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHySTRxuaW6M3xiBE24BNbcDqP5178rI4D5P+j415cLo wsl-smartmeter
