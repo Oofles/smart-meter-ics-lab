@@ -11,7 +11,9 @@ Any change to an address, type, or scaling must update this file and every consu
   > Implementation note: the Arduino PLC IDE (IEC 61131-3) was abandoned — its online
   > link would not connect on this bench across three IDE versions. The sketch is flashed
   > over USB with `arduino-cli` and is functionally identical for the exercise.
-- IP: `192.168.1.210` (static, set in the sketch via `Ethernet.begin`)
+- IP: `192.168.1.210` on the reference build; **per kit it's `192.168.1.(200+kit#)`** — the host
+  octet is stamped into the firmware at flash time via the `KITCFGv1` marker (see `PROVISION.md`),
+  so one prebuilt `.bin` serves every kit. Static, set in the sketch via `Ethernet.begin`.
 - Port: `502`
 - Unit / slave ID: the server answers **any** unit ID (ArduinoModbus TCP default). Clients
   may use `1`.

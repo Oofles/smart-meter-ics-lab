@@ -6,15 +6,21 @@ Ethernet segment during the exercise; the only thing that crosses between them i
 
 ## Addressing
 
+Set entirely by the **kit number** — kit N → Pi `.10N`, Opta `.20N`:
+
 | Device | IP | Notes |
 |--------|-----|-------|
-| Pi (wired/switch) | `192.168.1.(100 + kit)` | kit 9 → `.109`. Unique per kit → SSH/troubleshoot each kit distinctly. |
-| Opta | `192.168.1.210` | **Same on every kit** — local to each switch; the Pi talks to *its own* Opta. Keeps one firmware artifact. |
-| Pi (WiFi) | DHCP | Internet for setup only; disconnected/unused during the exercise. |
+| Pi (wired/switch) | `192.168.1.(100 + kit)` | kit 9 → `.109` |
+| Opta | `192.168.1.(200 + kit)` | kit 9 → `.209`. Stamped into the firmware at flash time (`patch_ip.py` rewrites a `KITCFGv1` marker) — **one prebuilt `.bin` serves every kit**, no recompile. |
+| Pi (WiFi) | DHCP | Internet for setup only; unused during the exercise. |
 
-Because every Opta is `.210`, **don't bridge the OT switches together** (they'd collide). Reach
-each **Pi** at its unique `.10x` when you plug into that kit's switch. If you ever need
-centrally-addressable Optas, that requires per-kit Opta firmware — not done today.
+Every device is uniquely addressed, so nothing collides — you **may** bridge the OT switches
+into one management LAN (all Pis `.10x`, all Optas `.20x`) if you want central reach. It's
+optional: the exercise runs on isolated islands and RF is the cross-kit attack path.
+
+**Personal test kit** (not one of the 45): Pi `.11`, Opta `.12` — a low-band pair kept clear of
+the `.1xx`/`.2xx` production ranges. Set the Pi with `nmcli`; flash its Opta with
+`sudo provision/opta_flash.sh 12`.
 
 ## Per-kit hardware
 
@@ -73,7 +79,8 @@ SCADA cred); don't ship it outside the lab. Add facilitator keys to that file be
 | Script | Does | Notes |
 |--------|------|-------|
 | `hat_config.py` | Writes the HAT to the golden config (ch 18 / 868.125 MHz, air-rate 2.4k, transparent) + verifies | `--read` to inspect only. Validated on the reference kit. |
-| `opta_flash.sh` | Flashes `opta/firmware/smart_meter.ino.bin` from the Pi via `dfu-util` (1200-baud touch → DFU → write 0x08040000) | No Arduino toolchain on the Pi; Opta must be on Pi USB. |
+| `opta_flash.sh <octet>` | Stamps this kit's IP into the firmware (`patch_ip.py`), then flashes from the Pi via `dfu-util` (1200-baud touch → DFU → 0x08040000) | No Arduino toolchain on the Pi; Opta must be on Pi USB. |
+| `patch_ip.py` | Rewrites the `KITCFGv1` IP-marker octet in a copy of the `.bin` | so one firmware serves every kit |
 | `kit_init.sh <kit>` | Per-clone: net + ssh + HAT + Opta + verify | thin wrapper over `provision.sh` phases |
 | `provision.sh <kit> [phase]` | Full/partial kit build, phased | Run once for the golden kit; validate on kit 2. |
 | `authorized_keys` | Management SSH public keys installed on every kit | add facilitator keys here |

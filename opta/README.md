@@ -1,7 +1,9 @@
 # opta/ — Opta smart-meter program
 
 The Arduino Opta (AFX00003, Opta WiFi) runs the smart-meter simulation and serves
-**Modbus TCP** at `192.168.1.210:502`. See `docs/register-map.md` for the contract.
+**Modbus TCP** at `192.168.1.210:502` (reference build; per kit it's `192.168.1.(200+kit#)` —
+the IP host octet is stamped into the firmware at flash time via a `KITCFGv1` marker, so one
+prebuilt `.bin` serves every kit; see `PROVISION.md`). See `docs/register-map.md` for the contract.
 
 - `smart_meter/smart_meter.ino` — the program (see "Why a sketch" below).
 - `backup/` — DFU image of the factory/preloaded firmware + restore runbook.

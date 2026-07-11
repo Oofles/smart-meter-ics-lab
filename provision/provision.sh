@@ -21,6 +21,8 @@ KIT="${1:-}"
   echo "usage: sudo provision/provision.sh <kit-number 1..99> [phase ...]" >&2; exit 2; }
 shift
 PI_IP="192.168.1.$((100 + KIT))"
+OPTA_OCTET="$((200 + KIT))"
+OPTA_IP="192.168.1.${OPTA_OCTET}"
 
 phase_system() {
   echo "== system: packages =="
@@ -65,14 +67,16 @@ phase_ssh() {
 }
 
 phase_scada() {
-  echo "== scada: bring up SCADA-LTS + import config (first boot builds the DB, ~5 min) =="
+  echo "== scada: bring up SCADA-LTS + import config (Opta host $OPTA_IP; first boot ~5 min) =="
   ( cd "$REPO/scada" && docker compose up -d )
   echo "   waiting for SCADA-LTS to answer..."
   for _ in $(seq 1 60); do
     curl -s -o /dev/null "http://127.0.0.1:8080/Scada-LTS/login.htm" && break
     sleep 10
   done
-  SCADA_URL="http://127.0.0.1:8080/Scada-LTS" python3 "$REPO/scada/emport.py" import "$REPO/scada/emport-config.json" || \
+  # point the SCADA data source at this kit's Opta IP
+  sed "s/192\.168\.1\.210/${OPTA_IP}/g" "$REPO/scada/emport-config.json" > /tmp/kit-emport.json
+  SCADA_URL="http://127.0.0.1:8080/Scada-LTS" python3 "$REPO/scada/emport.py" import /tmp/kit-emport.json || \
     echo "   (emport import failed — run it manually once SCADA is fully up)"
 }
 
@@ -87,7 +91,7 @@ Wants=network-online.target
 [Service]
 User=$RUN_USER
 WorkingDirectory=$REPO/listener
-ExecStart=/usr/bin/python3 $REPO/listener/listener.py
+ExecStart=/usr/bin/python3 $REPO/listener/listener.py --host $OPTA_IP
 Restart=on-failure
 RestartSec=5
 
@@ -100,16 +104,16 @@ UNIT
 }
 
 phase_hw() {
-  echo "== hardware: configure this HAT + flash this Opta =="
+  echo "== hardware: configure this HAT + flash this Opta ($OPTA_IP) =="
   sudo python3 "$HERE/hat_config.py"
-  sudo "$HERE/opta_flash.sh"
+  sudo "$HERE/opta_flash.sh" "$OPTA_OCTET"
 }
 
 phase_verify() {
-  echo "== verify (kit $KIT, Pi $PI_IP) =="
+  echo "== verify (kit $KIT: Pi $PI_IP, Opta $OPTA_IP) =="
   python3 "$HERE/hat_config.py" --read
   sleep 6
-  python3 "$REPO/scripts/mb_read.py" || echo "   (Opta not answering — check USB/Ethernet)"
+  python3 "$REPO/scripts/mb_read.py" "$OPTA_IP" || echo "   (Opta not answering — check USB/Ethernet)"
 }
 
 PHASES="${*:-system serial net ssh scada service hw verify}"

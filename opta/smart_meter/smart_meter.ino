@@ -37,7 +37,15 @@
 #include <ArduinoModbus.h>
 
 // ---- network ----
-IPAddress ip(192, 168, 1, 210);
+// Patchable per-kit config: provision/opta_flash.sh <last-octet> stamps the IP host byte into
+// the prebuilt firmware at flash time — it finds the "KITCFGv1" magic and rewrites the 4th IP
+// octet — so ONE .bin serves every kit (kit N -> 192.168.1.(200+N)). `volatile const` keeps the
+// bytes in flash (not constant-folded away) and forces a runtime read. Layout: 8-byte magic +
+// IP(4 octets). Do not reorder or the flasher's offset breaks.
+__attribute__((used)) volatile const uint8_t KIT_NETCFG[] = {
+  'K', 'I', 'T', 'C', 'F', 'G', 'v', '1', 192, 168, 1, 210
+};
+IPAddress ip;                                  // set from KIT_NETCFG in setup()
 IPAddress dnsServer(192, 168, 1, 1);
 IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 255, 255, 0);
@@ -155,6 +163,7 @@ void setup() {
   pinMode(IN_GREEN, INPUT);
   pinMode(IN_RESET, INPUT);
 
+  ip = IPAddress(KIT_NETCFG[8], KIT_NETCFG[9], KIT_NETCFG[10], KIT_NETCFG[11]);  // patchable per kit
   Ethernet.begin(NULL, ip, dnsServer, gateway, subnet);   // static, non-blocking
   ethServer.begin();
   mb.begin();                                              // unit id 0xff = answer all

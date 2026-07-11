@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
-# Flash the Opta smart-meter firmware from the Pi over USB — no Arduino toolchain needed,
-# just dfu-util + the prebuilt binary (opta/firmware/smart_meter.ino.bin).
+# Flash the Opta smart-meter firmware from the Pi over USB, with this kit's IP stamped in —
+# no Arduino toolchain, just dfu-util + the prebuilt binary (opta/firmware/smart_meter.ino.bin).
 #
-# The Opta must be connected to the Pi by USB. A 1200-baud "touch" drops it into its DFU
-# bootloader (VID:PID 2341:0364), then dfu-util writes the image to 0x08040000 and leaves DFU.
+# The IP host octet is patched into a copy of the .bin at flash time (patch_ip.py finds the
+# KITCFGv1 marker), so one firmware serves every kit. A 1200-baud "touch" drops the Opta into
+# its DFU bootloader (2341:0364); dfu-util writes to 0x08040000 and leaves DFU.
 #
-#   sudo ./opta_flash.sh                       # uses ../opta/firmware/smart_meter.ino.bin
-#   sudo ./opta_flash.sh /path/to/firmware.bin
+#   sudo ./opta_flash.sh <opta-ip-last-octet> [firmware.bin]
+#   sudo ./opta_flash.sh 209                 # kit 9 -> Opta 192.168.1.209
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-BIN="${1:-$HERE/../opta/firmware/smart_meter.ino.bin}"
+OCTET="${1:?usage: sudo ./opta_flash.sh <opta-ip-last-octet> [firmware.bin]}"
+BIN="${2:-$HERE/../opta/firmware/smart_meter.ino.bin}"
 PORT="${OPTA_PORT:-/dev/ttyACM0}"
 DFU_ID="2341:0364"
 DFU_ADDR="0x08040000"
@@ -18,7 +20,9 @@ DFU_ADDR="0x08040000"
 [ -f "$BIN" ] || { echo "[opta] firmware not found: $BIN" >&2; exit 1; }
 command -v dfu-util >/dev/null || { echo "[opta] dfu-util missing: sudo apt install -y dfu-util" >&2; exit 1; }
 
-echo "[opta] firmware: $BIN ($(stat -c%s "$BIN") bytes)"
+PATCHED="$(mktemp --suffix=.bin)"
+trap 'rm -f "$PATCHED"' EXIT
+echo "[opta] $(python3 "$HERE/patch_ip.py" "$BIN" "$OCTET" "$PATCHED")"
 
 # If not already in DFU, do the 1200-baud touch on the CDC port to trigger the bootloader.
 if ! dfu-util -l 2>/dev/null | grep -q "$DFU_ID"; then
@@ -38,5 +42,5 @@ done
 dfu-util -l 2>/dev/null | grep -q "$DFU_ID" || { echo "[opta] DFU device not found" >&2; exit 1; }
 
 echo "[opta] flashing..."
-dfu-util --device "0x${DFU_ID%%:*}:0x${DFU_ID##*:}" -a0 --dfuse-address="${DFU_ADDR}:leave" -D "$BIN"
-echo "[opta] done — Opta rebooting into the smart-meter sketch (Modbus TCP @ 192.168.1.210:502)."
+dfu-util --device "0x${DFU_ID%%:*}:0x${DFU_ID##*:}" -a0 --dfuse-address="${DFU_ADDR}:leave" -D "$PATCHED"
+echo "[opta] done — Opta rebooting; Modbus TCP @ 192.168.1.${OCTET}:502."
