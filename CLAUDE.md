@@ -123,6 +123,12 @@ unique IPs mean the OT switches *may* be bridged for management if wanted.
 - SCADA-LTS login is **intentionally left `admin/admin`** for this exercise — a planted
   default-credential weakness for the defenders to discover and flag. (Change it only if this
   rig ever leaves the isolated lab.)
+- **Opta Modbus server wedges on an eth0 link bounce.** The sketch's ArduinoModbus TCP server is
+  blocking single-client with no TCP keepalive, so if a Pi's eth0 IP changes / cable replugs / NM
+  reactivates, the abandoned (no-FIN) connection keeps `client.connected()` true and the Opta stays
+  stuck on the dead client — every new client then gets `RST` ("Connection reset by peer"). It does
+  **not** self-heal; **reboot the Opta** (reflash over USB, or reset button) to clear it. A
+  non-blocking server / keepalive is a firmware follow-up. (Bit us moving the central Pi `.11`→`.100`.)
 
 ## Status
 
