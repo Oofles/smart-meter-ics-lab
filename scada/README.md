@@ -43,11 +43,23 @@ no conversion:
 
 | Point | Register range | Offset | Point type | Notes |
 |-------|----------------|--------|------------|-------|
-| POWER_STATUS | Coil status | 0 | Binary | green/red bit |
+| POWER_STATUS | Coil status | 0 | Binary | healthy/fault bit |
 | RESET | Coil status | 15 | Binary (settable) | write 1 to re-arm |
 | VOLTAGE_X10 | Holding register | 0 | 2-byte unsigned | **multiplier 0.1** → shows 120.0 V |
 | POWER_W | Holding register | 1 | 2-byte unsigned | |
 | FW_MODE | Holding register | 9 | 2-byte unsigned | 0 normal / 1 malicious |
+
+**Panel mirror (Phase 4b)** — add these six as **Input status** (discrete input, function 02)
+Binary points so SCADA can render the same four-light panel + switch positions:
+
+| Point | Register range | Offset | Point type | Notes |
+|-------|----------------|--------|------------|-------|
+| LAMP_BLUE | Input status | 0 | Binary | O1 blue lamp |
+| LAMP_GREEN | Input status | 1 | Binary | O2 green lamp |
+| LAMP_YELLOW | Input status | 2 | Binary | O3 yellow lamp (dial past 6) |
+| LAMP_RED | Input status | 3 | Binary | O4 red lamp (faulted/attack) |
+| SW_BLUE | Input status | 4 | Binary | I1 switch position |
+| SW_GREEN | Input status | 5 | Binary | I2 switch position |
 
 Validate each point against the bench: `python3 scripts/mb_read.py` from the repo should
 match SCADA's live values.
@@ -65,10 +77,20 @@ In SCADA-LTS → **Graphical Views → add a view**:
    / **SmallDial**, range **0–250**. Place in the VOLTAGE panel; add a **Simple point**
    (numeric) beneath it for the `120.0` readout.
 4. **USAGE** — add a **Simple point** → point **POWER_W** in the USAGE panel.
-5. **Save**, then open the view (Views menu) — it renders live.
+5. **Four-light panel** — add four **Binary graphic** components, one per lamp point
+   **LAMP_BLUE / LAMP_GREEN / LAMP_YELLOW / LAMP_RED**, image set **Leds32** (or `LightBulb`)
+   with each mapped **1 → its color, 0 → off/grey**. Lay them out as a stack light to match
+   the Opta panel. Optionally add two small **Binary graphic**s for **SW_BLUE / SW_GREEN**
+   (image set **Switch3d**/**Contacts**) so the operator's switch positions show too — during
+   an attack the switch reads **on** while its lamp is forced **off**, which is the teachable
+   moment.
+6. **Save**, then open the view (Views menu) — it renders live.
 
-Verify: `python3 scripts/mb_trip.py` → indicator flips **red**, voltage & usage drop to
-**0**; `scripts/mb_reset.py` (or the I3 button / RESET coil) restores green.
+Verify: `python3 scripts/mb_trip.py` → **red** lamp lights, blue/green/yellow go **off**,
+POWER_STATUS flips, voltage & usage drop to **0**; `scripts/mb_reset.py` (or the I3 button /
+RESET coil) restores normal and the lamps resume following the I1/I2 switches + dial. Day-1
+blue-team check: flip **I1**→blue lamp, **I2**→green lamp, dial **past 6**→yellow lamp, all
+reflected live in SCADA.
 
 ## Versioning the config
 

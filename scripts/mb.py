@@ -45,6 +45,11 @@ def read_coils(addr, count=1, host=DEFAULT_HOST, port=DEFAULT_PORT, unit=DEFAULT
     return [(data[1 + i // 8] >> (i % 8)) & 1 for i in range(count)]
 
 
+def read_discrete_inputs(addr, count=1, host=DEFAULT_HOST, port=DEFAULT_PORT, unit=DEFAULT_UNIT):
+    data = _txn(struct.pack(">BHH", 2, addr, count), host, port, unit)
+    return [(data[1 + i // 8] >> (i % 8)) & 1 for i in range(count)]
+
+
 def write_register(addr, value, host=DEFAULT_HOST, port=DEFAULT_PORT, unit=DEFAULT_UNIT):
     _txn(struct.pack(">BHH", 6, addr, value & 0xFFFF), host, port, unit)
 
