@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fleet Status — ICS Exercise Console</title>
+<style>
+  :root {
+    --bg:#e9eef1; --panel:#ffffff; --panel-2:#f3f7f8; --tile:#ffffff;
+    --line:#d3dce0; --line-soft:#e2e9ec;
+    --text:#122029; --muted:#5a6b76; --faint:#8a99a2;
+    --accent:#0c9789; --accent-ink:#0a7c70;
+    --ok:#1f9d52; --warn:#ad7a12; --crit:#d63a26; --unknown:#7d8c96;
+    --ok-bg:#e3f4e9; --warn-bg:#f6edd6; --crit-bg:#fae0dc; --unknown-bg:#e7edf0;
+    --shadow:0 1px 2px rgba(18,32,41,.06), 0 6px 20px rgba(18,32,41,.06);
+    --radius:12px;
+    --mono:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0a0f14; --panel:#111a21; --panel-2:#0e161c; --tile:#0f181f;
+      --line:#22313a; --line-soft:#1a262e; --text:#d9e6ea; --muted:#8395a0; --faint:#5d6e78;
+      --accent:#37d1c1; --accent-ink:#4fdccd; --ok:#46cb6e; --warn:#e6b23c; --crit:#ff6149; --unknown:#647680;
+      --ok-bg:#12281b; --warn-bg:#2a2313; --crit-bg:#2e1713; --unknown-bg:#18232b;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 26px rgba(0,0,0,.34);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg:#e9eef1; --panel:#ffffff; --panel-2:#f3f7f8; --tile:#ffffff; --line:#d3dce0; --line-soft:#e2e9ec;
+    --text:#122029; --muted:#5a6b76; --faint:#8a99a2; --accent:#0c9789; --accent-ink:#0a7c70;
+    --ok:#1f9d52; --warn:#ad7a12; --crit:#d63a26; --unknown:#7d8c96;
+    --ok-bg:#e3f4e9; --warn-bg:#f6edd6; --crit-bg:#fae0dc; --unknown-bg:#e7edf0;
+    --shadow:0 1px 2px rgba(18,32,41,.06), 0 6px 20px rgba(18,32,41,.06);
+  }
+  :root[data-theme="dark"] {
+    --bg:#0a0f14; --panel:#111a21; --panel-2:#0e161c; --tile:#0f181f; --line:#22313a; --line-soft:#1a262e;
+    --text:#d9e6ea; --muted:#8395a0; --faint:#5d6e78; --accent:#37d1c1; --accent-ink:#4fdccd;
+    --ok:#46cb6e; --warn:#e6b23c; --crit:#ff6149; --unknown:#647680;
+    --ok-bg:#12281b; --warn-bg:#2a2313; --crit-bg:#2e1713; --unknown-bg:#18232b;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 26px rgba(0,0,0,.34);
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:var(--sans); line-height:1.5; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1500px; margin:0 auto; padding:18px clamp(14px,3vw,30px) 34px; }
+  .bar { display:flex; align-items:center; gap:16px 20px; flex-wrap:wrap; padding:14px 18px; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
+  .brand { display:flex; align-items:center; gap:12px; margin-right:auto; }
+  .dish { width:34px; height:34px; flex:none; border-radius:9px; background:linear-gradient(150deg,var(--accent),color-mix(in srgb,var(--accent) 55%, #000 12%)); display:grid; place-items:center; color:#03110f; font-size:18px; }
+  .brand h1 { margin:0; font-size:15px; letter-spacing:.2px; font-weight:650; }
+  .brand .sub { margin:0; font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .clock { font-family:var(--mono); font-size:13px; letter-spacing:.04em; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .chip { display:flex; align-items:center; gap:9px; padding:8px 12px; background:var(--panel-2); border:1px solid var(--line-soft); border-radius:10px; font-size:12.5px; white-space:nowrap; }
+  .chip .lab { font-family:var(--mono); font-size:10px; letter-spacing:.09em; text-transform:uppercase; color:var(--faint); }
+  .chip .val { font-weight:600; }
+  .led { width:9px; height:9px; border-radius:50%; flex:none; background:var(--unknown); box-shadow:0 0 0 3px color-mix(in srgb,var(--unknown) 22%, transparent); }
+  .led.on { background:var(--ok); box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 22%, transparent); }
+  .led.bad { background:var(--crit); box-shadow:0 0 0 3px color-mix(in srgb,var(--crit) 22%, transparent); }
+  .led.live { animation:pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity:.35; } }
+  .summary { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin:14px 0; }
+  .stat { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:12px 15px; box-shadow:var(--shadow); }
+  .stat .k { font-family:var(--mono); font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); display:flex; align-items:center; gap:7px; }
+  .stat .n { font-size:29px; font-weight:680; margin-top:4px; font-variant-numeric:tabular-nums; letter-spacing:-.01em; }
+  .stat .dot { width:9px; height:9px; border-radius:50%; }
+  .d-ok{background:var(--ok);} .d-warn{background:var(--warn);} .d-crit{background:var(--crit);} .d-unk{background:var(--unknown);} .d-tot{background:var(--accent);}
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
+  .card > h2 { margin:0; padding:13px 16px; font-size:12px; font-family:var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--line-soft); display:flex; align-items:center; gap:10px; }
+  .card > h2 .rt { margin-left:auto; text-transform:none; letter-spacing:0; color:var(--faint); }
+  .fleet { display:grid; grid-template-columns:repeat(auto-fill,minmax(122px,1fr)); gap:10px; padding:14px 16px; }
+  .kit { position:relative; background:var(--tile); border:1px solid var(--line); border-radius:10px; padding:11px 12px 11px 15px; overflow:hidden; cursor:pointer; text-align:left; font:inherit; color:inherit; transition:border-color .18s ease, transform .08s ease, box-shadow .18s ease; }
+  .kit:hover { border-color:color-mix(in srgb,var(--accent) 55%, var(--line)); transform:translateY(-1px); box-shadow:var(--shadow); }
+  .kit:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .kit::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--unknown); }
+  .kit.s-normal::before{background:var(--ok);} .kit.s-test::before{background:var(--warn);}
+  .kit.s-locked::before{background:var(--crit);} .kit.s-unknown::before{background:var(--unknown);}
+  .kit.s-locked { border-color:color-mix(in srgb,var(--crit) 42%, var(--line)); background:color-mix(in srgb,var(--crit-bg) 55%, var(--tile)); }
+  .kit.central { border-color:color-mix(in srgb,var(--accent) 55%, var(--line)); background:color-mix(in srgb,var(--accent) 8%, var(--tile)); }
+  .kit.central::after { content:"CENTRAL"; position:absolute; top:8px; right:0; font-family:var(--mono); font-size:8.5px; letter-spacing:.11em; color:#04110f; background:var(--accent); padding:2px 7px 2px 6px; border-radius:5px 0 0 5px; }
+  .kit .top { display:flex; align-items:baseline; justify-content:space-between; gap:6px; }
+  .kit .id { font-family:var(--mono); font-weight:650; font-size:15px; letter-spacing:.02em; }
+  .kit .id small { color:var(--faint); font-weight:500; }
+  .kit .seen { font-family:var(--mono); font-size:10.5px; color:var(--faint); font-variant-numeric:tabular-nums; }
+  .pill { display:inline-block; margin-top:9px; font-family:var(--mono); font-size:10px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; padding:3px 7px; border-radius:5px; border:1px solid transparent; }
+  .pill.s-normal{ color:var(--ok); background:var(--ok-bg); border-color:color-mix(in srgb,var(--ok) 30%,transparent);}
+  .pill.s-test{ color:var(--warn); background:var(--warn-bg); border-color:color-mix(in srgb,var(--warn) 32%,transparent);}
+  .pill.s-locked{ color:var(--crit); background:var(--crit-bg); border-color:color-mix(in srgb,var(--crit) 34%,transparent);}
+  .pill.s-unknown{color:var(--unknown);background:var(--unknown-bg);border-color:color-mix(in srgb,var(--unknown) 30%,transparent);}
+  .kit .rssi { display:flex; align-items:center; gap:7px; margin-top:10px; }
+  .bars { display:flex; align-items:flex-end; gap:2px; height:14px; }
+  .bars i { width:4px; border-radius:1px; background:var(--line); }
+  .bars i:nth-child(1){height:35%;} .bars i:nth-child(2){height:55%;} .bars i:nth-child(3){height:78%;} .bars i:nth-child(4){height:100%;}
+  .bars i.lit { background:var(--accent); }
+  .kit .dbm { font-family:var(--mono); font-size:10.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .scrim { position:fixed; inset:0; background:rgba(4,10,14,.42); opacity:0; pointer-events:none; transition:opacity .2s ease; z-index:20; }
+  .scrim.open { opacity:1; pointer-events:auto; }
+  .drawer { position:fixed; top:0; right:0; height:100%; width:min(400px,92vw); z-index:21; background:var(--panel); border-left:1px solid var(--line); box-shadow:-14px 0 40px rgba(0,0,0,.28); transform:translateX(100%); transition:transform .24s cubic-bezier(.4,0,.2,1); overflow-y:auto; }
+  .drawer.open { transform:none; }
+  .dhead { display:flex; align-items:center; gap:12px; padding:16px 18px; border-bottom:1px solid var(--line-soft); position:sticky; top:0; background:var(--panel); }
+  .dhead .kn { font-family:var(--mono); font-weight:680; font-size:20px; }
+  .dhead .role { font-family:var(--mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .x { margin-left:auto; background:var(--panel-2); border:1px solid var(--line); border-radius:8px; width:32px; height:32px; cursor:pointer; color:var(--text); font-size:16px; line-height:1; }
+  .x:hover { border-color:var(--accent); } .x:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .dbody { padding:16px 18px; display:flex; flex-direction:column; gap:16px; }
+  .sec h3 { margin:0 0 9px; font-family:var(--mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); }
+  .panel { display:flex; gap:12px; padding:14px; background:var(--panel-2); border:1px solid var(--line-soft); border-radius:10px; }
+  .lamp { display:flex; flex-direction:column; align-items:center; gap:6px; flex:1; }
+  .lamp .bulb { width:26px; height:26px; border-radius:50%; border:1px solid var(--line); background:var(--tile); }
+  .lamp .cap { font-family:var(--mono); font-size:9px; letter-spacing:.05em; text-transform:uppercase; color:var(--faint); }
+  .bulb.on.blue  { background:#3b82f6; border-color:#3b82f6; box-shadow:0 0 10px #3b82f6aa; }
+  .bulb.on.green { background:var(--ok); border-color:var(--ok); box-shadow:0 0 10px color-mix(in srgb,var(--ok) 65%,transparent); }
+  .bulb.on.yellow{ background:var(--warn); border-color:var(--warn); box-shadow:0 0 10px color-mix(in srgb,var(--warn) 65%,transparent); }
+  .bulb.on.red   { background:var(--crit); border-color:var(--crit); box-shadow:0 0 12px color-mix(in srgb,var(--crit) 70%,transparent); }
+  .kv { display:grid; grid-template-columns:auto 1fr; gap:7px 14px; font-size:13px; }
+  .kv dt { color:var(--muted); } .kv dd { margin:0; text-align:right; font-family:var(--mono); font-variant-numeric:tabular-nums; } .kv dd.big { font-weight:650; }
+  .fwtag { font-family:var(--mono); font-size:11px; font-weight:600; padding:2px 7px; border-radius:5px; }
+  .fw0{ color:var(--ok); background:var(--ok-bg);} .fw1{ color:var(--warn); background:var(--warn-bg);} .fw2{ color:var(--crit); background:var(--crit-bg);}
+  .drssi { display:flex; align-items:center; gap:10px; }
+  footer { margin-top:16px; display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center; padding:13px 16px; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
+  .leg { display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--muted); }
+  .leg .sw { width:12px; height:12px; border-radius:3px; }
+  footer .fine { margin-left:auto; font-size:11.5px; color:var(--faint); font-family:var(--mono); }
+  .themeBtn { font-family:var(--mono); font-size:11px; letter-spacing:.06em; padding:8px 11px; background:var(--panel-2); color:var(--text); border:1px solid var(--line); border-radius:9px; cursor:pointer; }
+  .themeBtn:hover { border-color:var(--accent); } .themeBtn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  @media (max-width:820px){ .summary { grid-template-columns:repeat(2,1fr); } }
+  @media (max-width:520px){ .summary{ grid-template-columns:1fr 1fr; } }
+  @media (prefers-reduced-motion: reduce){ *{ animation:none !important; transition:none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="bar">
+    <div class="brand">
+      <div class="dish" aria-hidden="true">📡</div>
+      <div><h1>Fleet Status — ICS Exercise Console</h1><p class="sub">Central node · LoRa 868&nbsp;MHz · ch18</p></div>
+    </div>
+    <div class="chip"><span class="lab">Collector</span><span class="led" id="collLed"></span><span class="val" id="collVal">connecting…</span></div>
+    <span class="clock" id="clock">--:--:--</span>
+    <button class="themeBtn" id="themeBtn" title="Toggle light / dark">◐ THEME</button>
+  </header>
+
+  <section class="summary" id="summary" aria-label="Fleet summary"></section>
+
+  <section class="card">
+    <h2>Fleet <span class="rt" id="fleetRt">node 00 (central) + kits 01–45</span></h2>
+    <div class="fleet" id="fleet"></div>
+  </section>
+
+  <footer>
+    <span class="leg"><span class="sw" style="background:var(--ok)"></span>Normal (energized)</span>
+    <span class="leg"><span class="sw" style="background:var(--warn)"></span>Test trip · FW_MODE&nbsp;1</span>
+    <span class="leg"><span class="sw" style="background:var(--crit)"></span>Exercise lock · FW_MODE&nbsp;2</span>
+    <span class="leg"><span class="sw" style="background:var(--unknown)"></span>Unknown / stale</span>
+    <span class="leg"><span class="bars" style="height:12px"><i class="lit"></i><i class="lit"></i><i></i><i></i></span>RSSI (heard signal)</span>
+    <span class="fine">live · status via LoRa mesh · ttl=1 direct + drone mule</span>
+  </footer>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="Kit detail">
+  <div class="dhead"><span class="kn" id="dKn">K00</span><span class="role" id="dRole">Blue-team kit</span>
+    <button class="x" id="dClose" aria-label="Close detail">✕</button></div>
+  <div class="dbody" id="dBody"></div>
+</aside>
+
+<script>
+(function(){
+  "use strict";
+  const $ = s => document.querySelector(s);
+  const root = document.documentElement;
+  $("#themeBtn").addEventListener("click", () => {
+    const cur = root.getAttribute("data-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    root.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
+  });
+  const clk = $("#clock");
+  setInterval(()=>{ const d=new Date(); clk.textContent=[d.getHours(),d.getMinutes(),d.getSeconds()].map(n=>String(n).padStart(2,"0")).join(":"); },1000);
+
+  const PILL = { normal:"Normal", test:"Test", locked:"Locked", unknown:"Unknown" };
+  const idTxt = id => "K"+String(id).padStart(2,"0");
+  const seenTxt = s => s===null||s===undefined ? "—" : (s<60 ? s+"s ago" : Math.floor(s/60)+"m ago");
+  const rssiBars = d => d===null||d===undefined ? 0 : d>=-60?4 : d>=-75?3 : d>=-90?2 : d>=-104?1 : 0;
+
+  let nodes = [];              // latest snapshot
+  let openId = null;           // kit id whose drawer is open
+
+  const SUM=[
+    {key:"total",lab:"Kits reporting",cls:"d-tot",f:F=>F.filter(k=>k.state!=="unknown").length+" / 45"},
+    {key:"normal",lab:"Normal",cls:"d-ok",f:F=>F.filter(k=>k.state==="normal").length},
+    {key:"test",lab:"Test trip",cls:"d-warn",f:F=>F.filter(k=>k.state==="test").length},
+    {key:"locked",lab:"Locked",cls:"d-crit",f:F=>F.filter(k=>k.state==="locked").length},
+    {key:"unknown",lab:"Unknown",cls:"d-unk",f:F=>F.filter(k=>k.state==="unknown").length},
+  ];
+  $("#summary").innerHTML = SUM.map(s=>`<div class="stat"><div class="k"><span class="dot ${s.cls}"></span>${s.lab}</div><div class="n" id="sum-${s.key}">–</div></div>`).join("");
+
+  const fleetEl = $("#fleet");
+  function tileInner(n){
+    const bars=rssiBars(n.rssi);
+    const barsHtml=[0,1,2,3].map(b=>`<i class="${b<bars?'lit':''}"></i>`).join("");
+    const dbm = n.central ? "local" : (n.rssi===null||n.rssi===undefined ? (n.state==="unknown"?"no signal":"—") : n.rssi+" dBm");
+    return `<div class="top"><span class="id"><small>K</small>${String(n.id).padStart(2,"0")}</span>
+        <span class="seen">${n.central?"live":seenTxt(n.last)}</span></div>
+      <span class="pill s-${n.state}">${PILL[n.state]}</span>
+      <div class="rssi"><span class="bars">${barsHtml}</span><span class="dbm">${dbm}</span></div>`;
+  }
+  function renderFleet(){
+    // build once, then update in place to preserve focus/scroll
+    if (fleetEl.children.length !== nodes.length){
+      fleetEl.innerHTML="";
+      nodes.forEach(n=>{
+        const el=document.createElement("button");
+        el.type="button"; el.id="kit"+n.id; el.dataset.id=n.id;
+        el.addEventListener("click",()=>openDetail(n.id));
+        fleetEl.appendChild(el);
+      });
+    }
+    nodes.forEach(n=>{
+      const el=$("#kit"+n.id);
+      el.className="kit s-"+n.state+(n.central?" central":"");
+      el.setAttribute("aria-label", idTxt(n.id)+" "+PILL[n.state]);
+      el.innerHTML=tileInner(n);
+    });
+  }
+  function renderSummary(){
+    const F = nodes.filter(n=>!n.central);
+    SUM.forEach(s=> $("#sum-"+s.key).textContent = s.f(F));
+  }
+
+  // ---- detail drawer ----
+  const scrim=$("#scrim"), drawer=$("#drawer");
+  function lamp(on,color,cap){ return `<div class="lamp"><span class="bulb ${on?'on':''} ${color}"></span><span class="cap">${cap}</span></div>`; }
+  function renderDetail(){
+    if (openId===null) return;
+    const n = nodes.find(x=>x.id===openId); if(!n) return;
+    $("#dKn").textContent=idTxt(n.id);
+    $("#dRole").textContent=n.central?"Central node (facilitator)":"Blue-team kit";
+    const piIp="192.168.1."+(100+n.id), optaIp="192.168.1."+(200+n.id);
+    let link;
+    if (n.central) link = `<div class="drssi"><span class="dbm" style="font-size:13px">USB / local Modbus — no RF hop</span></div>`;
+    else if (n.state==="unknown") link = `<div class="drssi"><span class="dbm" style="font-size:13px">no telemetry — last heard ${seenTxt(n.last)}</span></div>`;
+    else link = `<div class="drssi"><span class="bars" style="height:16px">${[0,1,2,3].map(b=>`<i class="${b<rssiBars(n.rssi)?'lit':''}"></i>`).join("")}</span>
+        <b style="font-family:var(--mono)">${n.rssi===null||n.rssi===undefined?"—":n.rssi+" dBm"}</b><span class="dbm">· ${seenTxt(n.last)}</span></div>`;
+
+    let meterHtml;
+    const m = n.meter;
+    if (m){
+      meterHtml = `<div class="panel">${lamp(m.lamps.blue,"blue","O1")}${lamp(m.lamps.green,"green","O2")}${lamp(m.lamps.yellow,"yellow","O3")}${lamp(m.lamps.red,"red","O4")}</div>
+        <dl class="kv" style="margin-top:12px">
+          <dt>Power status</dt><dd class="big">${m.power?"Energized":"Faulted"}</dd>
+          <dt>FW_MODE</dt><dd><span class="fwtag fw${m.fw??n.fw}">${(n.fw)} · ${PILL[n.state].toLowerCase()}</span></dd>
+          <dt>Voltage</dt><dd class="big">${m.voltage} V</dd><dt>Usage</dt><dd class="big">${m.watts} W</dd>
+          <dt>Switches</dt><dd>I1 ${m.sw.blue?"on":"off"} · I2 ${m.sw.green?"on":"off"}</dd></dl>`;
+    } else if (n.state==="unknown"){
+      meterHtml = `<p style="color:var(--muted);font-size:13px;margin:0">No meter telemetry — this kit hasn't beaconed within ${(window.__stale||45)}s. It may be out of range (awaiting drone mule).</p>`;
+    } else {
+      // field kit: beacon carries FW_MODE only — derive the panel, full meter is local to each kit
+      const faulted = n.state!=="normal";
+      meterHtml = `<div class="panel">${lamp(!faulted,"blue","O1")}${lamp(!faulted,"green","O2")}${lamp(false,"yellow","O3")}${lamp(faulted,"red","O4")}</div>
+        <dl class="kv" style="margin-top:12px">
+          <dt>Power status</dt><dd class="big">${faulted?"Faulted":"Energized"}</dd>
+          <dt>FW_MODE</dt><dd><span class="fwtag fw${n.fw}">${n.fw} · ${PILL[n.state].toLowerCase()}</span></dd>
+          <dt>Detail</dt><dd style="color:var(--muted)">beacon (state only)</dd></dl>`;
+    }
+    $("#dBody").innerHTML = `
+      <div class="sec"><h3>Meter / panel</h3>${meterHtml}</div>
+      <div class="sec"><h3>Link</h3>${link}</div>
+      <div class="sec"><h3>Addressing</h3><dl class="kv"><dt>Pi</dt><dd>${piIp}</dd><dt>Opta</dt><dd>${optaIp}</dd>
+        <dt>State</dt><dd><span class="pill s-${n.state}" style="margin:0">${PILL[n.state]}</span></dd></dl></div>`;
+  }
+  function openDetail(id){ openId=id; renderDetail(); scrim.classList.add("open"); drawer.classList.add("open"); $("#dClose").focus(); }
+  function closeDetail(){ openId=null; scrim.classList.remove("open"); drawer.classList.remove("open"); }
+  $("#dClose").addEventListener("click",closeDetail);
+  scrim.addEventListener("click",closeDetail);
+  document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeDetail(); });
+
+  // ---- poll the collector ----
+  const collLed=$("#collLed"), collVal=$("#collVal");
+  function setOnline(ok){ collLed.className="led "+(ok?"on live":"bad"); collVal.textContent = ok?"Listening":"Collector offline"; }
+  async function poll(){
+    try{
+      const r = await fetch("/api/fleet",{cache:"no-store"});
+      if(!r.ok) throw 0;
+      const data = await r.json();
+      window.__stale = data.stale_sec;
+      nodes = data.nodes;
+      renderFleet(); renderSummary(); renderDetail();
+      setOnline(true);
+    }catch(e){ setOnline(false); }
+  }
+  setInterval(poll, 1500); poll();
+})();
+</script>
+</body>
+</html>

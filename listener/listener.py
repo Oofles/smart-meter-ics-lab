@@ -28,7 +28,31 @@ import protocol
 
 HREG_FW_MODE = 9
 DEFAULT_TTL = 3
+BEACON_SEC = 20      # status-beacon heartbeat (plus jitter); also beacons on state change
+BEACON_JITTER = 8
 _seen = set()        # msg_ids already applied / relayed by this node
+
+
+def derive_kit_id(host):
+    """Kit number from the Opta IP: 192.168.1.(200+N) -> N; else 0 (override with --kit)."""
+    try:
+        octet = int(host.rsplit(".", 1)[1])
+        return octet - 200 if 1 <= octet - 200 <= 99 else 0
+    except (ValueError, IndexError):
+        return 0
+
+
+def consume_updates(buf, host, lora):
+    """Process complete SMFW update frames in buf, resyncing on the magic so status
+    beacons (SMST) and any garbage are skipped without misaligning the parser."""
+    while True:
+        i = buf.find(protocol.MAGIC)
+        if i < 0:
+            return buf[-3:] if len(buf) > 3 else buf   # keep a possible partial magic
+        if len(buf) - i < protocol.FRAME_LEN:
+            return buf[i:]                              # wait for the rest of the frame
+        on_frame(buf[i:i + protocol.FRAME_LEN], host, lora=lora)
+        buf = buf[i + protocol.FRAME_LEN:]
 
 
 def apply_update(info, host):
@@ -78,6 +102,7 @@ def main():
                     help="with malicious --send/--simulate: EXERCISE LOCK (FW_MODE=2 — operator RESET "
                          "disabled; clear only with a direct FW_MODE:=0 write). Default is TEST.")
     ap.add_argument("--simulate", choices=["malicious", "benign"], help="exercise apply+relay logic, no radio")
+    ap.add_argument("--kit", type=int, default=None, help="this node's kit id for status beacons (default: from --host)")
     args = ap.parse_args()
 
     def fw_type(kind):
@@ -105,15 +130,29 @@ def main():
             lora.send(frame)
             time.sleep(0.2)
             return
-        print("mesh node: listening on LoRa (%s) — Ctrl-C to stop" % lora.ser.port)
+        kit_id = args.kit if args.kit is not None else derive_kit_id(args.host)
+        print("mesh node K%02d: listening on LoRa (%s), beaconing status ttl=1 — Ctrl-C to stop"
+              % (kit_id, lora.ser.port))
         buf = b""
+        last_fw = None
+        next_beacon = 0.0
         while True:
+            now = time.monotonic()
+            try:
+                fw = mb.read_holding(HREG_FW_MODE, host=args.host)[0]
+            except Exception:
+                fw = last_fw if last_fw is not None else 0
+            # beacon on a heartbeat, and immediately whenever our state changes
+            if fw != last_fw or now >= next_beacon:
+                lora.send(protocol.build_status(kit_id, fw))
+                if last_fw is not None and fw != last_fw:
+                    print("  BEACON K%02d: state change -> FW_MODE=%d" % (kit_id, fw))
+                last_fw = fw
+                next_beacon = now + BEACON_SEC + random.uniform(0, BEACON_JITTER)
             chunk = lora.read_frame()
             if chunk:
                 buf += chunk
-                while len(buf) >= protocol.FRAME_LEN:
-                    on_frame(buf[:protocol.FRAME_LEN], args.host, lora=lora)
-                    buf = buf[protocol.FRAME_LEN:]
+                buf = consume_updates(buf, args.host, lora)
             else:
                 buf = b""                             # inter-frame gap -> drop partial
     except KeyboardInterrupt:

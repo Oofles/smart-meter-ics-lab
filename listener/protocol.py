@@ -47,3 +47,31 @@ def parse(frame: bytes) -> dict:
         return {"valid": False}
     return {"valid": True, "version": frame[4], "fw_type": frame[5],
             "msg_id": struct.unpack(">H", frame[6:8])[0], "ttl": frame[8]}
+
+
+# ---------------------------------------------------------------------------
+# STATUS beacon — the reverse direction: each field kit periodically announces
+# its own state so the central collector can build a fleet view. Distinct magic
+# so field kits (which scan for SMFW) ignore each other's beacons; only the
+# collector parses these. RSSI is NOT carried here — it's measured by the
+# receiver (the collector) from the radio, not known to the sender.
+#
+# Frame (9 bytes):  b"SMST" | version(1) | kit_id(1) | fw_mode(1) | crc16(2 BE)
+MAGIC_STATUS = b"SMST"
+STATUS_LEN = 9
+
+
+def build_status(kit_id: int, fw_mode: int, version: int = 1) -> bytes:
+    body = MAGIC_STATUS + bytes([version & 0xFF, kit_id & 0xFF, fw_mode & 0xFF])
+    return body + struct.pack(">H", crc16(body))
+
+
+def parse_status(frame: bytes) -> dict:
+    """-> {valid, version, kit_id, fw_mode}. valid=False on bad magic/CRC/len."""
+    frame = frame[:STATUS_LEN]
+    if len(frame) < STATUS_LEN or frame[:4] != MAGIC_STATUS:
+        return {"valid": False}
+    body, chk = frame[:STATUS_LEN - 2], frame[STATUS_LEN - 2:STATUS_LEN]
+    if struct.unpack(">H", chk)[0] != crc16(body):
+        return {"valid": False}
+    return {"valid": True, "version": frame[4], "kit_id": frame[5], "fw_mode": frame[6]}

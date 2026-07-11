@@ -61,7 +61,8 @@ use a reserved internal-flash sector via `FlashIAP`, bench-tested first.)
 
 - `opta/`     — Opta smart-meter Arduino sketch (`smart_meter/`) + prebuilt firmware (`firmware/`) + factory backup (`backup/`)
 - `scada/`    — SCADA-LTS deployment (docker-compose, ARM64) + `emport-config.json` + `emport.py` (headless Emport)
-- `listener/` — Pi-side update service: LoRa (serial) -> Modbus write
+- `listener/` — field-kit Pi service: LoRa (serial) -> Modbus write; also **beacons kit status**
+- `central/` — facilitator **fleet console**: `collector.py` (aggregates status beacons + local Kit 00 meter) + `fleet.html` live dashboard
 - `drone/`    — RF injection experiments (`beacon/` dead end, `rxsweep/` diagnostic — see `drone/README.md`)
 - `provision/`— kit build/replication: `provision.sh` (golden kit), `kit_init.sh` (per clone), `hat_config.py`, `opta_flash.sh`
 - `scripts/`  — test/helper scripts (Modbus poll, trip inject, reset)
