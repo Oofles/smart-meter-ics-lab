@@ -1,18 +1,25 @@
 """Waveshare SX1262 868M LoRa HAT (UART / EBYTE-style) driver for Raspberry Pi 5.
 
-UART on /dev/serial0 (=/dev/ttyAMA0 on Pi 5) @ 9600 8N1; mode pins M0=BCM22,
-M1=BCM27 on gpiochip0 (RP1) via lgpio. Board jumpers: UART-select = B,
-M0/M1 caps REMOVED. Modes (M0,M1): 0,0 = transceive (normal TX/RX), 0,1 = config.
+UART on the 40-pin header (GPIO14/15) @ 9600 8N1; mode pins M0=BCM22, M1=BCM27 on
+gpiochip0 (RP1) via lgpio. Board jumpers: UART-select = B, M0/M1 caps REMOVED (so the
+Pi GPIO — not a fixed GND jumper — drives the mode). Modes (M0,M1): 0,0 = transceive
+(normal TX/RX), 0,1 = config.
+
+Serial device = /dev/ttyAMA0 (the RP1 header UART), NOT /dev/serial0. On Raspberry Pi OS
+Bookworm serial0 -> ttyAMA0 so either worked, but on Debian 13 (trixie) serial0 -> ttyAMA10
+which is the *Bluetooth* SoC UART — writing there talks to nothing. ttyAMA0 is the header
+UART on both, so we address it directly. (See PROVISION.md env notes.)
 """
 import time
 import serial
 import lgpio
 
 M0_PIN, M1_PIN, GPIOCHIP = 22, 27, 0
+DEFAULT_PORT = "/dev/ttyAMA0"
 
 
 class LoRaHAT:
-    def __init__(self, port="/dev/serial0", baud=9600, timeout=0.5):
+    def __init__(self, port=DEFAULT_PORT, baud=9600, timeout=0.5):
         self.h = lgpio.gpiochip_open(GPIOCHIP)
         lgpio.gpio_claim_output(self.h, M0_PIN, 0)
         lgpio.gpio_claim_output(self.h, M1_PIN, 0)

@@ -107,9 +107,15 @@ UNIT
 }
 
 phase_hw() {
-  echo "== hardware: configure this HAT + flash this Opta ($OPTA_IP) =="
-  sudo python3 "$HERE/hat_config.py"
+  echo "== hardware: flash this Opta ($OPTA_IP) + configure this HAT =="
+  # Flash the Opta first — it's the deterministic, must-succeed step. Do NOT let a HAT
+  # hiccup (jumpers/antenna) abort it under 'set -e'; HAT config warns and carries on.
   sudo "$HERE/opta_flash.sh" "$OPTA_OCTET"
+  if ! sudo python3 "$HERE/hat_config.py"; then
+    echo "   WARNING: HAT config failed — check jumpers (UART-select=B, M0/M1 caps removed)," >&2
+    echo "            HAT seating, and that it's on /dev/ttyAMA0. Opta flash already succeeded;" >&2
+    echo "            re-run 'sudo python3 provision/hat_config.py' after fixing." >&2
+  fi
 }
 
 phase_verify() {

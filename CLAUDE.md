@@ -98,7 +98,12 @@ unique IPs mean the OT switches *may* be bridged for management if wanted.
   are **native multi-arch (arm64)** — no emulation, no MySQL-5.7 workaround. `scada/`
   pins those tags and runs natively on the Pi 5. (The old "budget time here" worry is moot.)
 - **Serial for LoRa:** enable the serial hardware and disable the login shell so the
-  SX1262 HAT gets a clean `/dev/ttyAMA0` on the Pi 5.
+  SX1262 HAT gets a clean `/dev/ttyAMA0` on the Pi 5. **Address `/dev/ttyAMA0` directly, not
+  `/dev/serial0`.** On Bookworm `serial0`→`ttyAMA0` (the RP1 header UART), but on **Debian 13
+  (trixie)** `serial0`→`ttyAMA10`, which is the **Bluetooth** SoC UART — talking to it reaches
+  nothing (silent HAT). `ttyAMA0` is the GPIO14/15 header UART on both OSes; `listener/lora.py`
+  and `provision/hat_config.py` use it. (Bit us on kit 9 — trixie image; diagnosed via `dmesg`
+  UART MMIO map + a config-mode probe against a known-good Bookworm kit.)
 - **Solo testing:** full over-the-air delivery needs a second LoRa node. Until then,
   validate the trip chain by feeding the listener a canned frame (`listener.py --simulate`),
   then wire real RF last.

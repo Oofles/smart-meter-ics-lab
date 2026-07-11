@@ -91,7 +91,7 @@ def main():
             lora.send(frame)
             time.sleep(0.2)
             return
-        print("mesh node: listening on LoRa (/dev/serial0) — Ctrl-C to stop")
+        print("mesh node: listening on LoRa (%s) — Ctrl-C to stop" % lora.ser.port)
         buf = b""
         while True:
             chunk = lora.read_frame()

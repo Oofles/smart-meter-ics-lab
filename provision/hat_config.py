@@ -6,8 +6,9 @@ reference kit): address 0/0, NETID 0, UART 9600 8N1, air-rate 2.4k, channel 18
 (= 850.125 + 18 = 868.125 MHz), transparent mode. This writes it to the HAT's NVM (C0)
 and verifies by reading back (C1).
 
-Pins: M0=BCM22, M1=BCM27 on gpiochip0; UART /dev/serial0 @ 9600. Board jumpers: UART-select=B,
-M0/M1 caps removed (same as listener/lora.py). Deps: pyserial, lgpio.
+Pins: M0=BCM22, M1=BCM27 on gpiochip0; UART /dev/ttyAMA0 @ 9600 (the RP1 header UART — NOT
+/dev/serial0, which is the Bluetooth UART on trixie; see listener/lora.py). Board jumpers:
+UART-select=B, M0/M1 caps removed (same as listener/lora.py). Deps: pyserial, lgpio.
 
   python3 hat_config.py          # write golden + verify   (use sudo if GPIO needs it)
   python3 hat_config.py --read   # just show current config, change nothing
@@ -15,7 +16,7 @@ M0/M1 caps removed (same as listener/lora.py). Deps: pyserial, lgpio.
 import sys, time, serial, lgpio
 
 M0, M1, CHIP = 22, 27, 0
-PORT = "/dev/serial0"
+PORT = "/dev/ttyAMA0"
 # 9 config registers @ addr 0: ADDH ADDL NETID REG3 REG4 CH(REG5) REG6 REG7 REG8
 GOLDEN = bytes([0x00, 0x00, 0x00, 0x62, 0x00, 0x12, 0x03, 0x00, 0x00])
 
