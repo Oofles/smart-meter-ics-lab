@@ -41,8 +41,8 @@ updating `docs/register-map.md` and every consumer.
 | Coil | 00001 | POWER_STATUS | 1=powered/healthy 0=faulted(attack)       | Opta     |
 | HReg | 40001 | VOLTAGE_X10  | volts x10 (1200 = 120.0 V), dial-driven   | Opta     |
 | HReg | 40002 | POWER_W      | instantaneous watts                       | Opta     |
-| HReg | 40010 | FW_MODE      | 0=normal 1=malicious ("updated firmware") | listener |
-| Coil | 00016 | RESET        | write 1 to clear fault back to normal     | ops      |
+| HReg | 40010 | FW_MODE      | 0=normal, 1=malicious TEST, 2=malicious LOCK | listener |
+| Coil | 00016 | RESET        | 1 clears a TEST trip; ignored when FW_MODE=2 | ops      |
 | DIn  | 10001 | LAMP_B/G/Y/R | O1..O4 lamp states (mirror, DIn 0..3)     | Opta     |
 | DIn  | 10005 | SW_BLUE/GREEN| I1/I2 switch positions (mirror, DIn 4..5) | Opta     |
 
@@ -50,7 +50,10 @@ Opta logic — the panel is an **operator HMI** (blue team's Day-1 setup task). 
 (normal): POWER_STATUS=1, VOLTAGE_X10 dial-driven w/ jitter, POWER_W random-walk; lamps
 **O1 blue=I1 switch, O2 green=I2 switch, O3 yellow=dial≥6(of 0–10), O4 red=off**. `FW_MODE!=0`
 (malicious update, via Modbus/RF payload — **no local trip switch**): POWER_STATUS=0,
-VOLTAGE_X10=0, POWER_W=0, **O1/O2/O3 off, O4 red on**. `RESET`=1 (coil or I3 button) -> FW_MODE=0.
+VOLTAGE_X10=0, POWER_W=0, **O1/O2/O3 off, O4 red on**. Two attack modes: **FW_MODE=1 TEST** — `RESET`
+(coil or I3) clears it; **FW_MODE=2 EXERCISE LOCK** — RESET ignored, persists across power-cycle (Opta
+flash via `Arduino_KVStore`), cleared **only** by a direct `FW_MODE:=0` write (facilitator "re-flash",
+`scripts/mb_unlock.py`). Drone selects mode via `listener.py --send malicious [--exercise]`.
 
 ## Repo layout
 

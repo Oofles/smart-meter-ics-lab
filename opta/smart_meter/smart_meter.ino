@@ -35,6 +35,7 @@
 #include <Ethernet.h>
 #include <ArduinoRS485.h>   // required dependency of ArduinoModbus, even for TCP
 #include <ArduinoModbus.h>
+#include <Arduino_KVStore.h>  // persist the exercise LOCK across power-cycles (Opta flash)
 
 // ---- network ----
 // Patchable per-kit config: provision/opta_flash.sh <last-octet> stamps the IP host byte into
@@ -52,9 +53,19 @@ IPAddress subnet(255, 255, 255, 0);
 EthernetServer ethServer(502);
 ModbusTCPServer mb;
 
+// Non-volatile lock flag: 1 while an exercise LOCK (FW_MODE=2) is in effect, so the fault
+// survives an Opta power-cycle. Written only on transitions (see meterTick), restored in setup.
+KVStore kvstore;
+static const char *KV_LOCK = "fwlock";
+uint8_t g_lock = 0;
+
 // ---- modbus map (0-based PDU addresses) ----
 enum { COIL_POWER_STATUS = 0, COIL_RESET = 15 };
 enum { HREG_VOLTAGE_X10 = 0, HREG_POWER_W = 1, HREG_FW_MODE = 9 };
+// FW_MODE values: 0=normal, 1=malicious TEST trip (operator RESET clears it),
+// 2=malicious EXERCISE LOCK (RESET ignored; persists across reboot; only a direct
+// FW_MODE:=0 write clears it — models a firmware re-flash by the facilitator).
+enum { FW_NORMAL = 0, FW_TEST = 1, FW_LOCKED = 2 };
 // diagnostics (raw ADC counts, 12-bit) so we can see the physical inputs over Modbus
 enum { HREG_RAW_BLUE = 20, HREG_RAW_RESET = 21, HREG_RAW_DIAL = 22, HREG_RAW_GREEN = 23 };
 // panel mirror for SCADA (read-only discrete inputs the Opta drives)
@@ -141,15 +152,29 @@ void meterTick() {
   bool coilReset  = mb.coilRead(COIL_RESET) > 0;
   bool localReset = rawReset > IN_THRESHOLD;
 
-  if (coilReset || localReset) {            // clear fault back to normal
-    fw = 0;
-    mb.holdingRegisterWrite(HREG_FW_MODE, 0);
-    mb.coilWrite(COIL_RESET, 0);            // self-clear the reset coil
+  // Operator RESET (SCADA coil / I3 button) clears a TEST trip (FW_MODE=1) but is IGNORED for
+  // an exercise LOCK (FW_MODE=2) — the blue team can't reset their way out; only a direct
+  // FW_MODE:=0 write (facilitator "re-flash") clears it. Always ack the coil so it doesn't stick.
+  if (coilReset || localReset) {
+    mb.coilWrite(COIL_RESET, 0);
+    if (fw != FW_LOCKED) {
+      fw = 0;
+      mb.holdingRegisterWrite(HREG_FW_MODE, 0);
+    }
   }
   // no local trip: the fault only fires from FW_MODE (RF payload / listener / Modbus write)
 
+  // Persist the LOCK across power-cycles: keep the flash flag in sync with the live register,
+  // writing only on transitions (0->lock when the attack lands, lock->0 on the facilitator unlock).
+  uint8_t want = (fw == FW_LOCKED) ? 1 : 0;
+  if (want != g_lock) {
+    if (want) kvstore.putUChar(KV_LOCK, 1);
+    else      kvstore.remove(KV_LOCK);
+    g_lock = want;
+  }
+
   if (fw == 0) applyNormal(swBlue, swGreen);
-  else         applyFault();
+  else         applyFault();                // FW_MODE 1 (test) or 2 (locked) both fault identically
 }
 
 void setup() {
@@ -172,7 +197,17 @@ void setup() {
   mb.configureDiscreteInputs(0x00, 6);                     // panel mirror 0..5
 
   rng ^= (uint32_t)analogRead(IN_DIAL) + 1;                // seed jitter from dial noise
-  applyNormal(false, false);                               // boot in a sane state
+
+  // Restore a persisted exercise LOCK: if the meter was locked before a power-cycle, come
+  // back up faulted (red) so a reboot can't clear it — only the facilitator's FW_MODE:=0 can.
+  kvstore.begin();
+  g_lock = kvstore.getUChar(KV_LOCK, 0);
+  if (g_lock) {
+    mb.holdingRegisterWrite(HREG_FW_MODE, FW_LOCKED);
+    applyFault();
+  } else {
+    applyNormal(false, false);                             // boot in a sane state
+  }
 }
 
 void loop() {

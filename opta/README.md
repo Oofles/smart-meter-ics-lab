@@ -27,9 +27,11 @@ Every ~500 ms the sketch reads the inputs and drives an **operator HMI** per
 **I1 switch → O1 blue, I2 switch → O2 green, dial past 6 (of 0–10) → O3 yellow**, plus
 `POWER_STATUS=1`, dial-driven `VOLTAGE_X10`, random-walk `POWER_W`. A delivered malicious
 update (`FW_MODE!=0`, **via Modbus write / the RF payload — there is no local trip switch**)
-faults the meter: O1/O2/O3 off, **O4 red on**, `VOLTAGE_X10`/`POWER_W`→0. `RESET` coil or the
-I3 button clears it and the panel resumes following the switches/dial. The four lamp states
-and the I1/I2 switch positions are mirrored to Modbus discrete inputs 0..5 for SCADA.
+faults the meter: O1/O2/O3 off, **O4 red on**, `VOLTAGE_X10`/`POWER_W`→0. Two modes: **`FW_MODE=1`
+TEST** — the `RESET` coil or I3 button clears it and the panel resumes; **`FW_MODE=2` EXERCISE LOCK**
+— RESET is ignored and the fault persists across a power-cycle (saved to Opta flash), cleared only by
+a direct `FW_MODE:=0` write (`scripts/mb_unlock.py`). The four lamp states and the I1/I2 switch
+positions are mirrored to Modbus discrete inputs 0..5 for SCADA.
 
 ## Physical I/O (plccable trainer)
 
@@ -51,8 +53,11 @@ One-time libs:
 
 ```
 arduino-cli core install arduino:mbed_opta
-arduino-cli lib install ArduinoModbus ArduinoRS485
+arduino-cli lib install ArduinoModbus ArduinoRS485 Arduino_KVStore
 ```
+
+> `Arduino_KVStore` persists the **exercise-lock** flag to Opta flash so a locked meter
+> (`FW_MODE=2`) stays faulted across a power-cycle — see `docs/register-map.md` ("Attack modes").
 
 Build + upload (Opta on USB; port is the lower/sketch COM port, e.g. COM4):
 
@@ -67,9 +72,11 @@ factory demo, see `opta/backup/README.md`.
 ## Verify (from the Pi / any host on the LAN)
 
 ```
-python3 scripts/mb_read.py     # live state
-python3 scripts/mb_trip.py     # inject FW_MODE=1  -> fault
-python3 scripts/mb_reset.py    # clear -> normal
+python3 scripts/mb_read.py         # live state
+python3 scripts/mb_trip.py         # inject FW_MODE=1 (TEST trip) -> fault
+python3 scripts/mb_reset.py        # operator reset -> normal (clears TEST only)
+python3 scripts/mb_trip.py --lock  # inject FW_MODE=2 (EXERCISE LOCK) -> fault, RESET disabled
+python3 scripts/mb_unlock.py       # facilitator unlock (FW_MODE:=0) -> clears TEST or LOCK
 ```
 
 ## Tuning

@@ -16,8 +16,9 @@ Frame (11 bytes):
 import struct
 
 MAGIC = b"SMFW"
-TYPE_BENIGN = 0x00      # normal firmware / version heartbeat
-TYPE_MALICIOUS = 0x01   # the "malicious firmware update"
+TYPE_BENIGN = 0x00        # normal firmware / version heartbeat
+TYPE_MALICIOUS = 0x01     # malicious update, TEST mode -> FW_MODE=1 (operator RESET clears it)
+TYPE_MALICIOUS_LOCK = 0x02  # malicious update, EXERCISE mode -> FW_MODE=2 (locked; RESET ignored)
 FRAME_LEN = 11
 
 
