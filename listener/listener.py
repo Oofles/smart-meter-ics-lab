@@ -36,7 +36,7 @@ def apply_update(info, host):
     if t == protocol.TYPE_MALICIOUS:
         fw, note = 1, "FW_MODE=1 (TEST trip — operator RESET clears it)"
     elif t == protocol.TYPE_MALICIOUS_LOCK:
-        fw, note = 2, "FW_MODE=2 (EXERCISE LOCK — RESET disabled, survives reboot)"
+        fw, note = 2, "FW_MODE=2 (EXERCISE LOCK — operator RESET disabled)"
     else:
         print("    benign firmware/heartbeat v%d — no-op" % info["version"])
         return
