@@ -23,6 +23,17 @@ PI_IP="192.168.1.$((100 + KIT))"
 OPTA_OCTET="$((200 + KIT))"
 OPTA_IP="192.168.1.${OPTA_OCTET}"
 
+# Run a HAT command with the listener paused — it holds /dev/ttyAMA0 + the M0/M1 GPIO
+# lines, so hat_config would hit "GPIO busy" while it runs (e.g. after a reboot on clones).
+with_hat() {
+  local was=0
+  systemctl is-active --quiet smartmeter-listener && was=1
+  [ "$was" = 1 ] && { sudo systemctl stop smartmeter-listener; sleep 1; }
+  "$@"; local rc=$?
+  [ "$was" = 1 ] && sudo systemctl start smartmeter-listener
+  return $rc
+}
+
 phase_system() {
   echo "== system: packages =="
   sudo apt-get update
@@ -111,7 +122,7 @@ phase_hw() {
   # Flash the Opta first — it's the deterministic, must-succeed step. Do NOT let a HAT
   # hiccup (jumpers/antenna) abort it under 'set -e'; HAT config warns and carries on.
   sudo "$HERE/opta_flash.sh" "$OPTA_OCTET"
-  if ! sudo python3 "$HERE/hat_config.py"; then
+  if ! with_hat sudo python3 "$HERE/hat_config.py"; then
     echo "   WARNING: HAT config failed — check jumpers (UART-select=B, M0/M1 caps removed)," >&2
     echo "            HAT seating, and that it's on /dev/ttyAMA0. Opta flash already succeeded;" >&2
     echo "            re-run 'sudo python3 provision/hat_config.py' after fixing." >&2
@@ -120,7 +131,7 @@ phase_hw() {
 
 phase_verify() {
   echo "== verify (kit $KIT: Pi $PI_IP, Opta $OPTA_IP) =="
-  python3 "$HERE/hat_config.py" --read
+  with_hat python3 "$HERE/hat_config.py" --read || echo "   (HAT read failed — check jumpers/seating)"
   sleep 6
   python3 "$REPO/scripts/mb_read.py" "$OPTA_IP" || echo "   (Opta not answering — check USB/Ethernet)"
 }
