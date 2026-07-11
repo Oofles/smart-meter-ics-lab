@@ -54,11 +54,16 @@ VOLTAGE_X10=0, POWER_W=0, **O1/O2/O3 off, O4 red on**. `RESET`=1 (coil or I3 but
 
 ## Repo layout
 
-- `opta/`     — Opta smart-meter Arduino sketch (`smart_meter/`) + factory-firmware backup (`backup/`)
-- `scada/`    — SCADA-LTS deployment (docker-compose, ARM64-adjusted) + exported view/datasource config
+- `opta/`     — Opta smart-meter Arduino sketch (`smart_meter/`) + prebuilt firmware (`firmware/`) + factory backup (`backup/`)
+- `scada/`    — SCADA-LTS deployment (docker-compose, ARM64) + `emport-config.json` + `emport.py` (headless Emport)
 - `listener/` — Pi-side update service: LoRa (serial) -> Modbus write
+- `drone/`    — RF injection experiments (`beacon/` dead end, `rxsweep/` diagnostic — see `drone/README.md`)
+- `provision/`— kit build/replication: `provision.sh` (golden kit), `kit_init.sh` (per clone), `hat_config.py`, `opta_flash.sh`
 - `scripts/`  — test/helper scripts (Modbus poll, trip inject, reset)
 - `docs/`     — `register-map.md` (contract), `architecture.md`
+
+Kit replication (1 -> 45): **isolated identical islands** — see `PROVISION.md`. Golden SD image
++ per-clone `kit_init.sh` (configures that HAT, flashes that Opta). RF is the only cross-kit link.
 
 ## Tech stack
 
