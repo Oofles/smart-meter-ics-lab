@@ -16,7 +16,10 @@ Each field kit's `listener.py` **beacons** its state over LoRa — a tiny `SMST`
 (`kit_id + FW_MODE`), sent on a ~20 s heartbeat **and immediately on any state change**,
 at **`ttl=1`** (direct only — no relay storm). The collector hears whatever is in range;
 kits out of range show **Unknown** until the **drone mules** their status back (planned).
-RSSI is measured by the collector's radio (needs the HAT's RSSI-append bit — see below).
+RSSI is measured by the collector's radio — enable the HAT's RSSI-append bit on **this
+node only** with `sudo python3 provision/hat_config.py --rssi` (field kits stay on plain
+golden; it's a receive-side setting, same PHY, so they still interoperate). The module
+then appends one RSSI byte per received packet; the collector reports it as dBm.
 
 ```
 [field kit] --SMST beacon (kit_id, FW_MODE), ttl=1--> [central: collector] --> dashboard
@@ -25,19 +28,22 @@ RSSI is measured by the collector's radio (needs the HAT's RSSI-append bit — s
 ## Run it
 
 ```bash
+# one-time: enable RSSI-append on THIS node's HAT (field kits don't get this):
+sudo python3 provision/hat_config.py --rssi
 # on the central node (its own Opta = Kit 00 at --host):
 sudo python3 central/collector.py --host 192.168.1.200 --port 8090
 # open the dashboard:  http://<central-pi>:8090/
 ```
 
-`--host` is the central node's **own** Opta IP; `--port` defaults to 8090 (kept off SCADA's 8080).
+`--host` is the central node's **own** Opta IP (Kit 00 = `192.168.1.200`); `--port` defaults
+to 8090 (kept off SCADA's 8080).
 
 ## Status / TODO
 
 - [x] Status beacon (`protocol.SMST`) + field-kit beaconing (`listener.py`, auto kit-id from `--host`).
 - [x] Collector: aggregate beacons + local Kit 00 meter + dashboard/JSON.
-- [ ] **RSSI** — enable the EBYTE RSSI-append bit in the golden HAT config; the collector
-  already reads a trailing RSSI byte when present (`rssi=null` until enabled).
+- [x] **RSSI** — `hat_config.py --rssi` enables the EBYTE RSSI-append bit on the central HAT;
+  collector reads the trailing byte and reports dBm. Validated over the air (K09 ≈ −10…−32 dBm on the bench).
 - [ ] **Drone mule** — drone logs `{kit, state, time}` per sortie and uploads to the
   collector when back in range, resolving out-of-range (Unknown) kits.
 - [ ] A `smartmeter-collector.service` unit + a spot in provisioning for the central node.

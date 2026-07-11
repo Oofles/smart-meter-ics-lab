@@ -9,12 +9,13 @@ Runs on the central node (Pi + SX1262 HAT + its own Opta = "Kit 00"). It:
   - polls its local Opta over Modbus for the full Kit 00 meter (lamps/volts/watts);
   - serves the live dashboard (central/fleet.html) + a JSON feed at /api/fleet.
 
-  sudo python3 central/collector.py --host 192.168.1.12 --port 8090
+  sudo python3 central/collector.py --host 192.168.1.200 --port 8090
     --host  this central node's own Opta (Kit 00) Modbus IP
     --port  dashboard/JSON port (default 8090; avoid SCADA's 8080)
 
-Field kits run listener.py (which now beacons). RSSI needs the HAT's RSSI-append
-bit; until that's enabled the collector reports rssi=null (dashboard shows "—").
+Field kits run listener.py (which now beacons). Per-packet RSSI comes from the
+central HAT's RSSI-append bit — configure this node's HAT with
+`provision/hat_config.py --rssi` (field kits stay on plain golden).
 """
 import argparse
 import json
@@ -193,7 +194,7 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     global _args
     ap = argparse.ArgumentParser()
-    ap.add_argument("--host", default="192.168.1.12", help="this central node's own Opta (Kit 00) Modbus IP")
+    ap.add_argument("--host", default="192.168.1.200", help="this central node's own Opta (Kit 00) Modbus IP")
     ap.add_argument("--port", type=int, default=8090, help="dashboard/JSON port")
     _args = ap.parse_args()
 
