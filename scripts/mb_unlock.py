@@ -2,8 +2,7 @@
 """Facilitator UNLOCK: clear any fault (incl. the exercise LOCK) via a direct FW_MODE := 0 write.
 
 Models a firmware re-flash. Unlike mb_reset.py (the operator RESET coil, which an exercise
-LOCK / FW_MODE=2 deliberately ignores), this ALWAYS clears — the Opta also wipes its persisted
-lock flag, so the meter won't come back faulted after a reboot.
+LOCK / FW_MODE=2 deliberately ignores), this ALWAYS clears the fault — TEST or LOCK.
 
 Usage: ./mb_unlock.py [host]   (default host 192.168.1.210)
 """

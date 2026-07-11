@@ -3,7 +3,7 @@
 
 Usage: ./mb_trip.py [host] [--lock]   (default host 192.168.1.210)
   (default)  FW_MODE := 1  TEST trip    — operator RESET (mb_reset.py / I3) clears it
-  --lock     FW_MODE := 2  EXERCISE LOCK — RESET disabled, persists across reboot;
+  --lock     FW_MODE := 2  EXERCISE LOCK — operator RESET disabled;
                                            clear only with mb_unlock.py (direct FW_MODE:=0)
 """
 import sys

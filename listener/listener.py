@@ -75,8 +75,8 @@ def main():
     ap.add_argument("--send", choices=["malicious", "benign"], help="inject an update over LoRa (the drone)")
     ap.add_argument("--ttl", type=int, default=DEFAULT_TTL, help="hop limit for --send")
     ap.add_argument("--exercise", action="store_true",
-                    help="with malicious --send/--simulate: EXERCISE LOCK (FW_MODE=2 — RESET disabled, "
-                         "persists across reboot; clear only with a direct FW_MODE:=0 write). Default is TEST.")
+                    help="with malicious --send/--simulate: EXERCISE LOCK (FW_MODE=2 — operator RESET "
+                         "disabled; clear only with a direct FW_MODE:=0 write). Default is TEST.")
     ap.add_argument("--simulate", choices=["malicious", "benign"], help="exercise apply+relay logic, no radio")
     args = ap.parse_args()
 

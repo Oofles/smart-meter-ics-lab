@@ -78,8 +78,8 @@ every ~500 ms:
   # NOTE: no local trip. The fault fires ONLY from FW_MODE (RF payload / listener /
   # direct Modbus write) — so a direct-Modbus attacker can also trigger it.
 
-  # persist the LOCK across power-cycles (Opta flash): flag := (FW_MODE == 2), written on
-  # transitions only; restored at boot so a reboot cannot clear a locked meter.
+  # NOTE: FW_MODE is RAM only — a power-cycle clears even a LOCK. Flash-persisting the lock
+  # across reboots is a planned follow-up (FlashIAP reserved sector).
 
   if FW_MODE == 0:            # normal — operator drives the panel
       POWER_STATUS := 1
@@ -99,11 +99,16 @@ Both fault the meter identically (red, zero); they differ only in **recovery**:
 | FW_MODE | Mode | Injected by | Cleared by |
 |---------|------|-------------|------------|
 | 1 | **TEST** | `mb_trip.py` / `listener.py --send malicious` | operator RESET — coil 15 or the I3 button (`mb_reset.py`) |
-| 2 | **EXERCISE LOCK** | `mb_trip.py --lock` / `listener.py --send malicious --exercise` | **only** a direct `FW_MODE := 0` write (`mb_unlock.py`) — RESET is ignored and the lock survives an Opta power-cycle (persisted in flash) |
+| 2 | **EXERCISE LOCK** | `mb_trip.py --lock` / `listener.py --send malicious --exercise` | **only** a direct `FW_MODE := 0` write (`mb_unlock.py`) — the operator RESET (coil 15 / I3) is ignored |
 
 The LOCK models "the malicious firmware can't be reset away" — the blue team's normal recovery
 (RESET button / SCADA reset) does nothing; recovery needs the facilitator's out-of-band re-flash
-(the direct `FW_MODE := 0`). Requires the `Arduino_KVStore` library at Opta build time.
+(the direct `FW_MODE := 0`).
+
+> **Persistence — RAM only for now.** The lock is not yet stored in non-volatile memory, so an
+> Opta **power-cycle also clears it**. Flash-persisting it across reboots (so only the unlock
+> recovers) is a planned follow-up — `Arduino_KVStore` hard-faults on this H7, so the intended
+> mechanism is a reserved internal-flash sector via `FlashIAP`, validated on the bench first.
 
 ## Physical layer (Opta trainer I/O, driven by the sketch)
 

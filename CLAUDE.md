@@ -51,9 +51,11 @@ Opta logic — the panel is an **operator HMI** (blue team's Day-1 setup task). 
 **O1 blue=I1 switch, O2 green=I2 switch, O3 yellow=dial≥6(of 0–10), O4 red=off**. `FW_MODE!=0`
 (malicious update, via Modbus/RF payload — **no local trip switch**): POWER_STATUS=0,
 VOLTAGE_X10=0, POWER_W=0, **O1/O2/O3 off, O4 red on**. Two attack modes: **FW_MODE=1 TEST** — `RESET`
-(coil or I3) clears it; **FW_MODE=2 EXERCISE LOCK** — RESET ignored, persists across power-cycle (Opta
-flash via `Arduino_KVStore`), cleared **only** by a direct `FW_MODE:=0` write (facilitator "re-flash",
-`scripts/mb_unlock.py`). Drone selects mode via `listener.py --send malicious [--exercise]`.
+(coil or I3) clears it; **FW_MODE=2 EXERCISE LOCK** — operator RESET ignored, cleared **only** by a
+direct `FW_MODE:=0` write (facilitator "re-flash", `scripts/mb_unlock.py`). Drone selects mode via
+`listener.py --send malicious [--exercise]`. (LOCK is RAM-only for now — a power-cycle clears it too;
+flash-persistence across reboots is a planned follow-up: `Arduino_KVStore` hard-faults on the H7, so
+use a reserved internal-flash sector via `FlashIAP`, bench-tested first.)
 
 ## Repo layout
 
