@@ -11,4 +11,4 @@ import mb
 
 host = sys.argv[1] if len(sys.argv) > 1 else mb.DEFAULT_HOST
 mb.write_register(9, 0, host=host)      # FW_MODE (holding reg 9) := 0 (direct)
-print("FW_MODE := 0  — facilitator unlock: fault cleared, persisted lock flag wiped")
+print("FW_MODE := 0  — facilitator unlock: fault cleared (TEST or LOCK)")
