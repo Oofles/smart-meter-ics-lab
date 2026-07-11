@@ -30,7 +30,7 @@ then appends one RSSI byte per received packet; the collector reports it as dBm.
 ```bash
 # one-time: enable RSSI-append on THIS node's HAT (field kits don't get this):
 sudo python3 provision/hat_config.py --rssi
-# on the central node (its own Opta = Kit 00 at --host):
+# run once in the foreground (own Opta = Kit 00 at --host):
 sudo python3 central/collector.py --host 192.168.1.200 --port 8090
 # open the dashboard:  http://<central-pi>:8090/
 ```
@@ -38,12 +38,27 @@ sudo python3 central/collector.py --host 192.168.1.200 --port 8090
 `--host` is the central node's **own** Opta IP (Kit 00 = `192.168.1.200`); `--port` defaults
 to 8090 (kept off SCADA's 8080).
 
+### As a service (survives reboot)
+
+`smartmeter-collector.service` (this dir) is the central-node counterpart to the field kits'
+`smartmeter-listener.service`. It runs as `vivicat` (needs `gpio`+`dialout` for the HAT),
+`PYTHONUNBUFFERED=1` so RX-beacon lines hit `journalctl` live.
+
+```bash
+sudo cp central/smartmeter-collector.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now smartmeter-collector
+journalctl -u smartmeter-collector -f          # watch beacons land
+```
+
 ## Status / TODO
 
 - [x] Status beacon (`protocol.SMST`) + field-kit beaconing (`listener.py`, auto kit-id from `--host`).
 - [x] Collector: aggregate beacons + local Kit 00 meter + dashboard/JSON.
 - [x] **RSSI** — `hat_config.py --rssi` enables the EBYTE RSSI-append bit on the central HAT;
   collector reads the trailing byte and reports dBm. Validated over the air (K09 ≈ −10…−32 dBm on the bench).
+- [x] `smartmeter-collector.service` unit (this dir) — installed + enabled on the central
+  node (`.100`); survives reboot, RX lines live in `journalctl`.
 - [ ] **Drone mule** — drone logs `{kit, state, time}` per sortie and uploads to the
   collector when back in range, resolving out-of-range (Unknown) kits.
-- [ ] A `smartmeter-collector.service` unit + a spot in provisioning for the central node.
+- [ ] Fold the central-node setup (HAT `--rssi`, this service) into provisioning.

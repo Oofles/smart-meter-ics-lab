@@ -1,0 +1,22 @@
+[Unit]
+# Central-node fleet collector: RX status beacons over LoRa, apply attacks to this
+# node's own Opta (Kit 00), poll it over Modbus, and serve the dashboard + /api/fleet.
+# Central-node counterpart to smartmeter-listener.service (which runs on field kits).
+# Assumes the central node's layout: repo at /home/vivicat/smart-meter-ics-lab, user
+# vivicat (in gpio+dialout for the SX1262 HAT), own Opta = Kit 00 at 192.168.1.200.
+# Enable RSSI-append on this node's HAT first: sudo python3 provision/hat_config.py --rssi
+Description=Smart-meter fleet collector (central node: beacon RX + dashboard)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=vivicat
+WorkingDirectory=/home/vivicat/smart-meter-ics-lab
+# Unbuffered so RX-beacon lines hit journalctl live (Python block-buffers under systemd).
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /home/vivicat/smart-meter-ics-lab/central/collector.py --host 192.168.1.200 --port 8090
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
