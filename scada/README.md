@@ -94,10 +94,23 @@ reflected live in SCADA.
 
 ## Versioning the config
 
-Use **Import/Export (Emport)** in the UI to serialize data sources + points (+ views) to
-**JSON**; commit that JSON here (e.g. `scada/emport-datasource.json`). Caveat: a full
-project *import* deletes existing config first — safe for a repo-driven rebuild, not against
-a live instance.
+The data source + all 11 points (5 core + the 6 panel-mirror discrete inputs) are versioned
+in **`scada/emport-config.json`**, serialized via **Emport**. The six panel points were
+provisioned headlessly with **`scada/emport.py`** (drives SCADA-LTS's DWR-backed Emport over
+HTTP) and verified live against the Opta — trip → red on / others off with the switches still
+reading on.
+
+```
+python3 scada/emport.py export scada/emport-config.json   # re-serialize after UI changes
+python3 scada/emport.py import scada/emport-config.json    # (re)create points on a fresh box
+```
+
+Import is **additive/upsert by xid** (matches + creates/updates points; does not delete
+points missing from the JSON), so it's safe to re-run against the live rig. Env overrides:
+`SCADA_URL`, `SCADA_USER`, `SCADA_PASS` (default the Pi + `admin/admin`). A **full project**
+import (the UI's project-file import) still deletes existing config first — use the JSON
+data-source/points Emport above for incremental changes. Graphical **views** aren't included
+here; place them in the UI per the steps above.
 
 ## Persistence / ops
 
