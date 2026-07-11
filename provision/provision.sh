@@ -105,6 +105,9 @@ Wants=network-online.target
 [Service]
 User=$RUN_USER
 WorkingDirectory=$REPO/listener
+# Unbuffered so the listener's RX/APPLY lines hit journalctl live — facilitators can
+# watch the attack land in real time (Python block-buffers stdout under systemd otherwise).
+Environment=PYTHONUNBUFFERED=1
 ExecStart=/usr/bin/python3 $REPO/listener/listener.py --host $OPTA_IP
 Restart=on-failure
 RestartSec=5
