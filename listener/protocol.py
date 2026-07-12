@@ -19,6 +19,7 @@ MAGIC = b"SMFW"
 TYPE_BENIGN = 0x00        # normal firmware / version heartbeat
 TYPE_MALICIOUS = 0x01     # malicious update, TEST mode -> FW_MODE=1 (operator RESET clears it)
 TYPE_MALICIOUS_LOCK = 0x02  # malicious update, EXERCISE mode -> FW_MODE=2 (locked; RESET ignored)
+TYPE_RESET = 0x03         # facilitator recovery over RF -> FW_MODE:=0 (clears TEST *and* LOCK)
 FRAME_LEN = 11
 
 

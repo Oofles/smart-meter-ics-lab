@@ -7,11 +7,14 @@ Runs on the central node (Pi + SX1262 HAT + its own Opta = "Kit 00"). It:
   - applies malicious update frames to its OWN local Opta (Kit 00) — so the central
     node is itself a valid attack target you can demo against in the room;
   - polls its local Opta over Modbus for the full Kit 00 meter (lamps/volts/watts);
-  - serves the live dashboard (central/fleet.html) + a JSON feed at /api/fleet.
+  - serves the live dashboard (central/fleet.html) + a JSON feed at /api/fleet;
+  - **transmits** payloads from Kit 00 to all in-range kits over LoRa via POST /api/send
+    {"type": "malicious"|"malicious_lock"|"reset"|"benign", "ttl": 1} — the drone/console
+    role, without stopping the collector (it shares the HAT with the RX loop).
 
   sudo python3 central/collector.py --host 192.168.1.200 --port 8090
     --host  this central node's own Opta (Kit 00) Modbus IP
-    --port  dashboard/JSON port (default 8090; avoid SCADA's 8080)
+    --port  dashboard/JSON port (default 8090)
 
 Field kits run listener.py (which now beacons). Per-packet RSSI comes from the
 central HAT's RSSI-append bit — configure this node's HAT with
@@ -20,6 +23,7 @@ central HAT's RSSI-append bit — configure this node's HAT with
 import argparse
 import json
 import os
+import random
 import sys
 import threading
 import time
@@ -40,6 +44,16 @@ _lock = threading.Lock()
 _fleet = {}                       # kit_id -> {"fw":int, "rssi":int|None, "last":monotonic}
 _central_meter = {"present": False}
 _args = None
+_lora = None                      # the HAT, shared by the RX loop and the /api/send TX
+_lora_lock = threading.Lock()     # serialize HAT access (RX read vs. facilitator TX)
+
+# facilitator TX from Kit 00 — payloads the console can broadcast to all in-range kits
+SEND_TYPES = {
+    "malicious": protocol.TYPE_MALICIOUS,        # TEST trip  (operator RESET clears)
+    "malicious_lock": protocol.TYPE_MALICIOUS_LOCK,  # EXERCISE LOCK (RESET disabled)
+    "reset": protocol.TYPE_RESET,                # facilitator recovery (FW_MODE:=0)
+    "benign": protocol.TYPE_BENIGN,              # version heartbeat (no-op)
+}
 
 
 def fw_state(fw):
@@ -55,12 +69,29 @@ def rssi_from_byte(b):
 def rf_loop(lora):
     buf = b""
     while True:
-        chunk = lora.read_frame()
+        with _lora_lock:          # share the HAT with facilitator TX (/api/send)
+            chunk = lora.read_frame()
         if not chunk:
             buf = b""             # inter-packet gap -> drop any partial
             continue
         buf += chunk
         buf = _consume(buf, lora)
+
+
+def transmit(kind, ttl=1):
+    """Facilitator broadcast from Kit 00: send a payload to every in-range kit over LoRa,
+    and apply it to our own Opta too (Kit 00 is a node). ttl>1 floods via relays to kits
+    out of direct range. Returns a small result dict for the /api/send caller."""
+    t = SEND_TYPES[kind]
+    ttl = max(1, min(int(ttl), 8))
+    mid = random.randint(0, 0xFFFF)
+    frame = protocol.build(t, mid, ttl)
+    fieldnode._seen.add(mid)                                  # ignore our own frame if it echoes
+    fieldnode.apply_update(protocol.parse(frame), _args.host)  # apply to Kit 00's Opta (no relay)
+    with _lora_lock:
+        _lora.send(frame)
+    print("  TX %s ttl=%d msg_id=0x%04X -> broadcast to all in-range kits" % (kind, ttl, mid))
+    return {"ok": True, "type": kind, "ttl": ttl, "msg_id": mid}
 
 
 def _consume(buf, lora):
@@ -190,6 +221,28 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send(404, "text/plain", b"not found")
 
+    def do_POST(self):
+        # facilitator TX: broadcast a payload over LoRa to all in-range kits
+        if self.path.rstrip("/") == "/api/send":
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(n) or b"{}")
+            except (ValueError, json.JSONDecodeError):
+                self._send(400, "application/json", b'{"ok":false,"error":"bad json"}')
+                return
+            kind = body.get("type")
+            if kind not in SEND_TYPES:
+                self._send(400, "application/json",
+                           json.dumps({"ok": False, "error": "unknown type %r" % kind}).encode())
+                return
+            try:
+                res = transmit(kind, body.get("ttl", 1))
+                self._send(200, "application/json", json.dumps(res).encode())
+            except Exception as e:
+                self._send(500, "application/json", json.dumps({"ok": False, "error": str(e)}).encode())
+            return
+        self._send(404, "text/plain", b"not found")
+
 
 def main():
     global _args
@@ -198,9 +251,10 @@ def main():
     ap.add_argument("--port", type=int, default=8090, help="dashboard/JSON port")
     _args = ap.parse_args()
 
+    global _lora
     from lora import LoRaHAT
-    lora = LoRaHAT()
-    threading.Thread(target=rf_loop, args=(lora,), daemon=True).start()
+    _lora = LoRaHAT()
+    threading.Thread(target=rf_loop, args=(_lora,), daemon=True).start()
     threading.Thread(target=central_loop, daemon=True).start()
 
     srv = ThreadingHTTPServer(("0.0.0.0", _args.port), Handler)
@@ -211,7 +265,7 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
-        lora.close()
+        _lora.close()
 
 
 if __name__ == "__main__":

@@ -25,6 +25,29 @@ then appends one RSSI byte per received packet; the collector reports it as dBm.
 [field kit] --SMST beacon (kit_id, FW_MODE), ttl=1--> [central: collector] --> dashboard
 ```
 
+## Facilitator TX — the RF console
+
+Kit 00 is also the **drone/injection** node: the collector transmits over the same HAT it
+listens on (they share it via a lock), so you can broadcast to every in-range kit **without
+stopping the service**. The dashboard's **RF Console** has the buttons; under the hood they
+POST to the collector:
+
+```bash
+# trip all in-range kits (TEST — operator RESET clears), direct-only:
+curl -s -XPOST localhost:8090/api/send -d '{"type":"malicious","ttl":1}'
+# EXERCISE LOCK (RESET disabled):        {"type":"malicious_lock","ttl":1}
+# facilitator recovery — clears TEST *and* LOCK everywhere:
+curl -s -XPOST localhost:8090/api/send -d '{"type":"reset","ttl":1}'
+```
+
+`ttl>1` floods via relays to kits out of direct range. Each send also applies to Kit 00's own
+Opta (it's a node too). The **`reset`** frame (`protocol.TYPE_RESET`) is the RF version of the
+facilitator's `mb_unlock.py` — a field kit's `listener.py` writes `FW_MODE:=0` on receipt.
+(Kits still on older firmware ignore an unknown frame type as a no-op, so it's safe to mix.)
+
+Standalone (collector stopped), the same frames go out via `listener.py --send reset` /
+`--send malicious [--exercise]`.
+
 ## Run it
 
 ```bash
@@ -55,6 +78,8 @@ journalctl -u smartmeter-collector -f          # watch beacons land
 
 - [x] Status beacon (`protocol.SMST`) + field-kit beaconing (`listener.py`, auto kit-id from `--host`).
 - [x] Collector: aggregate beacons + local Kit 00 meter + dashboard/JSON.
+- [x] **RF console** — `POST /api/send` + dashboard buttons broadcast TEST / LOCK / reset from
+  Kit 00 to all in-range kits (shares the HAT with the RX loop; no service stop). New `reset` frame.
 - [x] **RSSI** — `hat_config.py --rssi` enables the EBYTE RSSI-append bit on the central HAT;
   collector reads the trailing byte and reports dBm. Validated over the air (K09 ≈ −10…−32 dBm on the bench).
 - [x] `smartmeter-collector.service` unit (this dir) — installed + enabled on the central

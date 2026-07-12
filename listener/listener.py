@@ -61,6 +61,14 @@ def apply_update(info, host):
         fw, note = 1, "FW_MODE=1 (TEST trip — operator RESET clears it)"
     elif t == protocol.TYPE_MALICIOUS_LOCK:
         fw, note = 2, "FW_MODE=2 (EXERCISE LOCK — operator RESET disabled)"
+    elif t == protocol.TYPE_RESET:
+        # facilitator recovery over RF: force FW_MODE:=0, clearing TEST *and* LOCK
+        print("    APPLY: RESET update v%d -> FW_MODE=0 (recover — clears TEST and LOCK)" % info["version"])
+        try:
+            mb.write_register(HREG_FW_MODE, 0, host=host)
+        except Exception as e:
+            print("    (Modbus write failed: %s)" % e)
+        return
     else:
         print("    benign firmware/heartbeat v%d — no-op" % info["version"])
         return
@@ -96,18 +104,20 @@ def on_frame(frame, host, lora=None):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--host", default=mb.DEFAULT_HOST, help="this node's Opta Modbus host")
-    ap.add_argument("--send", choices=["malicious", "benign"], help="inject an update over LoRa (the drone)")
+    ap.add_argument("--send", choices=["malicious", "benign", "reset"], help="inject an update over LoRa (the drone); 'reset' = facilitator recovery (FW_MODE:=0 everywhere)")
     ap.add_argument("--ttl", type=int, default=DEFAULT_TTL, help="hop limit for --send")
     ap.add_argument("--exercise", action="store_true",
                     help="with malicious --send/--simulate: EXERCISE LOCK (FW_MODE=2 — operator RESET "
                          "disabled; clear only with a direct FW_MODE:=0 write). Default is TEST.")
-    ap.add_argument("--simulate", choices=["malicious", "benign"], help="exercise apply+relay logic, no radio")
+    ap.add_argument("--simulate", choices=["malicious", "benign", "reset"], help="exercise apply+relay logic, no radio")
     ap.add_argument("--kit", type=int, default=None, help="this node's kit id for status beacons (default: from --host)")
     args = ap.parse_args()
 
     def fw_type(kind):
         if kind == "malicious":
             return protocol.TYPE_MALICIOUS_LOCK if args.exercise else protocol.TYPE_MALICIOUS
+        if kind == "reset":
+            return protocol.TYPE_RESET
         return protocol.TYPE_BENIGN
 
     # --simulate needs no hardware: it drives parse -> apply (-> relay is logged).
