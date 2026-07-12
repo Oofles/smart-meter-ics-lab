@@ -2,7 +2,7 @@
 
 **This file is the single source of truth for the Opta <-> everything interface.**
 Any change to an address, type, or scaling must update this file and every consumer
-(Opta sketch, SCADA-LTS data points, listener) in the same commit.
+(Opta sketch, listener, central collector) in the same commit.
 
 ## Server
 
@@ -24,7 +24,7 @@ Addresses below are **0-based Modbus PDU addresses** (what the sketch and most c
 libraries use). Conventional entity numbers are shown for reference; note `mbpoll` uses
 **1-based** references, so `mbpoll -r <PDU+1>`.
 
-| Type        | PDU addr | Entity | Name         | Type/Scale        | R/W by SCADA | Written by | Meaning                                   |
+| Type        | PDU addr | Entity | Name         | Type/Scale        | R/W by client | Written by | Meaning                                   |
 |-------------|----------|--------|--------------|-------------------|--------------|------------|-------------------------------------------|
 | Coil        | 0        | 000001 | POWER_STATUS | bit               | read         | Opta       | 1 = powered/healthy, 0 = faulted (attack) |
 | Coil        | 15       | 000016 | RESET        | bit               | write        | ops        | operator reset: 1 clears a TEST trip (FW_MODE 1→0); **ignored when FW_MODE=2 (locked)** |
@@ -32,11 +32,11 @@ libraries use). Conventional entity numbers are shown for reference; note `mbpol
 | Holding Reg | 1        | 400002 | POWER_W      | uint16, watts     | read         | Opta       | instantaneous usage; 0 in fault           |
 | Holding Reg | 9        | 400010 | FW_MODE      | uint16            | (read)       | listener   | 0=normal, 1=malicious TEST trip, 2=malicious EXERCISE LOCK (see below) |
 
-### Panel mirror — discrete inputs (read-only bits the Opta drives, for the SCADA HMI)
+### Panel mirror — discrete inputs (read-only bits the Opta drives, for the fleet view)
 
-Function 02 (Read Discrete Inputs). These let SCADA render the **same four-light panel**
-the operator sees on the Opta, plus the physical switch positions. All are written by the
-Opta, read-only to clients.
+Function 02 (Read Discrete Inputs). These let a Modbus client (the central collector) read the
+**same four-light panel** the operator sees on the Opta, plus the physical switch positions.
+All are written by the Opta, read-only to clients.
 
 | Type           | PDU addr | Name        | Meaning                                             |
 |----------------|----------|-------------|-----------------------------------------------------|
@@ -48,10 +48,10 @@ Opta, read-only to clients.
 | Discrete Input | 5        | SW_GREEN    | I2 switch position (operator's green-light request) |
 
 > Why mirror both switch **and** lamp: in normal state `LAMP_BLUE == SW_BLUE`, but during a
-> fault the lamp is forced off while the switch may still read on — SCADA then shows the
-> attack overriding operator intent.
+> fault the lamp is forced off while the switch may still read on — the fleet view then shows
+> the attack overriding operator intent.
 
-### Diagnostics (raw ADC counts, 12-bit 0..4095) — for bring-up/SCADA debug
+### Diagnostics (raw ADC counts, 12-bit 0..4095) — for bring-up/debug
 
 | Type        | PDU addr | Name       | Meaning                                    |
 |-------------|----------|------------|--------------------------------------------|
@@ -102,7 +102,7 @@ Both fault the meter identically (red, zero); they differ only in **recovery**:
 | 2 | **EXERCISE LOCK** | `mb_trip.py --lock` / `listener.py --send malicious --exercise` | **only** a direct `FW_MODE := 0` write (`mb_unlock.py`) — the operator RESET (coil 15 / I3) is ignored |
 
 The LOCK models "the malicious firmware can't be reset away" — the blue team's normal recovery
-(RESET button / SCADA reset) does nothing; recovery needs the facilitator's out-of-band re-flash
+(the RESET button / I3) does nothing; recovery needs the facilitator's out-of-band re-flash
 (the direct `FW_MODE := 0`).
 
 > **Persistence — RAM only for now.** The lock is not yet stored in non-volatile memory, so an
@@ -123,10 +123,11 @@ The LOCK models "the malicious firmware can't be reset away" — the blue team's
 
 ## Consumers
 
-- **SCADA-LTS**: Modbus IP data source ->
+- **Central collector** (Kit 00, `central/collector.py`): Modbus poll of its own Opta ->
   - POWER_STATUS (coil 0), VOLTAGE_X10 (hreg 0, /10), POWER_W (hreg 1).
   - Panel mirror: LAMP_BLUE/GREEN/YELLOW/RED (discrete inputs 0..3), SW_BLUE/SW_GREEN
-    (discrete inputs 4..5). Poll ~1 s.
+    (discrete inputs 4..5). Poll ~1.5 s. (Field kits have no software reader — the physical
+    panel is the operator view.)
 - **Listener**: on a recognized malicious payload, write `FW_MODE` (FC06, hreg 9) — `1` for a
   TEST update, `2` for an EXERCISE-LOCK update (frame type byte selects which; see `protocol.py`).
 - **Reset**: operator RESET — write `RESET := 1` (FC05, coil 15) or press I3 — clears a TEST trip

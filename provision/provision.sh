@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
-# provision.sh — build/provision a kit from a baseline Raspberry Pi OS (Bookworm, 64-bit).
+# provision.sh — build/provision ONE kit from a fresh Raspberry Pi OS (64-bit, Bookworm/trixie).
+#
+# Run this ON each kit (git clone the repo first). No golden image, no cloning — every kit is
+# built individually, so its wired IP, listener service, and Opta firmware are all stamped
+# per-kit. This is the whole replication method: repeat it on each of the 45 kits.
 #
 # Usage:  sudo provision/provision.sh <kit-number> [phase ...]
-#   <kit-number>  1..99 — sets this Pi's wired IP to 192.168.1.(100+kit)  (kit 9 -> .109)
-#   phases (default all, in order): system serial net ssh scada service hw verify
+#   <kit-number>  1..99 — sets this Pi's wired IP to 192.168.1.(100+kit)  (kit 9 -> .109);
+#                 the Opta is flashed to 192.168.1.(200+kit)  (kit 9 -> .209).
+#   phases (default all, in order): system serial net ssh service hw verify
 #
-# The Opta stays 192.168.1.210 on every kit (single firmware; the Pi talks to its own Opta
-# locally). Kits are isolated islands — don't bridge the OT switches (all Optas share .210).
-# Assumes: internet (WiFi) available; Waveshare HAT seated; Opta on Pi USB.
+# Every device is uniquely addressed (Pi .10N, Opta .20N), so the OT switches MAY be bridged
+# into one management LAN if you want central reach; the exercise itself runs on isolated
+# islands with LoRa RF as the only cross-kit path.
+# Assumes: internet (WiFi) available for setup; Waveshare HAT seated; Opta on Pi USB.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -38,11 +44,6 @@ phase_system() {
   echo "== system: packages =="
   sudo apt-get update
   sudo apt-get install -y dfu-util python3-serial python3-lgpio git curl openssh-server
-  if ! command -v docker >/dev/null; then
-    echo "== installing docker =="
-    curl -fsSL https://get.docker.com | sudo sh
-    sudo usermod -aG docker "$RUN_USER"
-  fi
 }
 
 phase_serial() {
@@ -78,20 +79,6 @@ phase_ssh() {
   sudo chmod 600 "$HOME_DIR/.ssh/authorized_keys"
   sudo chown -R "$RUN_USER:$RUN_USER" "$HOME_DIR/.ssh"
   echo "   ssh up; keys from provision/authorized_keys installed for $RUN_USER"
-}
-
-phase_scada() {
-  echo "== scada: bring up SCADA-LTS + import config (Opta host $OPTA_IP; first boot ~5 min) =="
-  ( cd "$REPO/scada" && docker compose up -d )
-  echo "   waiting for SCADA-LTS to answer..."
-  for _ in $(seq 1 60); do
-    curl -s -o /dev/null "http://127.0.0.1:8080/Scada-LTS/login.htm" && break
-    sleep 10
-  done
-  # point the SCADA data source at this kit's Opta IP
-  sed "s/192\.168\.1\.210/${OPTA_IP}/g" "$REPO/scada/emport-config.json" > /tmp/kit-emport.json
-  SCADA_URL="http://127.0.0.1:8080/Scada-LTS" python3 "$REPO/scada/emport.py" import /tmp/kit-emport.json || \
-    echo "   (emport import failed — run it manually once SCADA is fully up)"
 }
 
 phase_service() {
@@ -139,6 +126,6 @@ phase_verify() {
   python3 "$REPO/scripts/mb_read.py" "$OPTA_IP" || echo "   (Opta not answering — check USB/Ethernet)"
 }
 
-PHASES="${*:-system serial net ssh scada service hw verify}"
+PHASES="${*:-system serial net ssh service hw verify}"
 for p in $PHASES; do "phase_$p"; done
 echo "provision: kit $KIT, phases [$PHASES] complete."

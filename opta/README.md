@@ -31,7 +31,7 @@ faults the meter: O1/O2/O3 off, **O4 red on**, `VOLTAGE_X10`/`POWER_W`→0. Two 
 TEST** — the `RESET` coil or I3 button clears it and the panel resumes; **`FW_MODE=2` EXERCISE LOCK**
 — the operator RESET is ignored, cleared only by a direct `FW_MODE:=0` write (`scripts/mb_unlock.py`).
 The four lamp states and the I1/I2 switch positions are mirrored to Modbus discrete inputs 0..5 for
-SCADA. (LOCK is RAM-only for now — a power-cycle clears it; flash-persistence is a planned follow-up.)
+the central fleet view. (LOCK is RAM-only for now — a power-cycle clears it; flash-persistence is a planned follow-up.)
 
 ## Physical I/O (plccable trainer)
 

@@ -8,18 +8,19 @@
    (O1 blue, O2 green, O3 yellow, O4 red) the blue team configures via switches I1/I2 and
    the voltage dial; the lamp + switch states are mirrored to Modbus discrete inputs.
 
-2. **SCADA-LTS on the Pi (the operator view).** Polls the Opta over Modbus and renders
-   the hosted page: the four-light panel (LAMP_* discrete inputs) + switch positions, and a
-   voltage/usage meter (VOLTAGE_X10, POWER_W). POWER_STATUS is the healthy/fault bit.
-
-3. **RF update channel (the attack surface).** A LoRa HAT (serial) feeds a Pi-side
+2. **RF update channel (the attack surface).** A LoRa HAT (serial) feeds a Pi-side
    listener. The listener treats inbound payloads as "firmware updates" and writes
-   FW_MODE accordingly.
+   FW_MODE accordingly. The operator view is the Opta's **physical four-light panel**
+   (subsystem 1) — there is no software HMI. POWER_STATUS/VOLTAGE/POWER_W are read over
+   Modbus only for the central fleet dashboard.
+
+3. **Central node (Kit 00, facilitator).** Aggregates every field kit's status beacons
+   over RF and serves a live fleet dashboard for the red team (see `central/`).
 
 ## Kill chain (normal -> attack -> reset)
 
 0. **Day-1 setup (blue team).** Operator switches I1/I2 on (blue + green lamps) and turns the
-   voltage dial past 6 (yellow lamp) — verifying their meter's I/O works, in SCADA too.
+   voltage dial past 6 (yellow lamp) — verifying their meter's I/O works on the panel.
 1. **Normal.** Opta: FW_MODE=0 -> POWER_STATUS=1, voltage ~120 V with jitter, usage
    walking. Panel: blue/green (operator) + yellow (dial) lit; red off.
 2. **Delivery.** Attacker transmits a malicious "firmware update" over LoRa. The same
@@ -28,7 +29,7 @@
 3. **Apply.** Listener decodes the payload, "applies the update," writes FW_MODE=1.
 4. **Effect.** Opta latches fault: POWER_STATUS=0, voltage/usage=0, **all operator lamps off,
    red on** — even though the I1/I2 switches are still on (the attack overrides operator intent).
-5. **Observe.** SCADA panel: blue/green/yellow drop, red lights, meter drops to zero.
+5. **Observe.** Panel: blue/green/yellow drop, red lights; voltage/usage drop to zero.
 6. **Reset.** Ops writes RESET=1 -> FW_MODE=0 -> normal state; demo re-armed.
 
 ## Design decisions

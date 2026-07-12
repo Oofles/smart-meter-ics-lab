@@ -32,6 +32,11 @@ isolates "is the PLC right" from "is SCADA configured right."
 
 ## Phase 3 — SCADA-LTS on the Pi
 
+> **Phases 3–4 (SCADA-LTS operator view) were DESCOPED.** They were built and working, then
+> removed from scope: the blue team's operator view is the Opta's **physical four-light panel**,
+> not a software HMI — so there is no Docker/SCADA on the kits and `scada/` was deleted. The
+> two phases are kept below only as historical record.
+
 Deploy via Docker Compose (services: database + scadalts, image `scadalts/scadalts`).
 
 - **ARM64 first:** the stock compose pins `mysql-server:5.7` (no clean arm64 build).

@@ -1,5 +1,11 @@
 # Resume notes
 
+> **Superseded — historical.** These notes are from the Phase-4 pause (the SCADA era). Since
+> then: SCADA was **descoped** (the Opta's physical panel is the operator view; `scada/` was
+> deleted), the RF listener + LoRa flood mesh + two attack modes shipped and were validated over
+> the air, and the Kit 00 central collector/dashboard + RSSI landed. For current state see
+> `CLAUDE.md` (Status) and `PROVISION.md`. Kept for history.
+
 Paused after **Phase 4**. The full scenario works end to end on the bench:
 `mb_trip.py` → Opta trips (red lamp, meter→0) → SCADA-LTS operator view flips red/zero →
 `mb_reset.py` recovers. Next up: **Phase 5** (RF listener).

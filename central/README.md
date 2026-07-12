@@ -36,7 +36,7 @@ sudo python3 central/collector.py --host 192.168.1.200 --port 8090
 ```
 
 `--host` is the central node's **own** Opta IP (Kit 00 = `192.168.1.200`); `--port` defaults
-to 8090 (kept off SCADA's 8080).
+to 8090.
 
 ### As a service (survives reboot)
 

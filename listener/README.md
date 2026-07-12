@@ -51,8 +51,8 @@ listener points at its own Opta.
 1. Run `./listener.py` on **every meter's Pi** (each with its own `--host`).
 2. From the **drone/injection** node run `./listener.py --send malicious`.
 3. Every node in range applies it (its meter trips) and relays it; nodes out of the
-   drone's range trip via a neighbour's relay. Watch each meter go red in SCADA;
-   `scripts/mb_reset.py` (or the I3 button) re-arms.
+   drone's range trip via a neighbour's relay. Watch each meter's panel go red (red lamp,
+   voltage/usage to zero); `scripts/mb_reset.py` (or the I3 button) re-arms.
 
 Solo (one radio): `--simulate malicious` proves the apply chain without a partner;
 full mesh propagation needs ≥2 SX1262 nodes.

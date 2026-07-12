@@ -10,13 +10,16 @@ contract lives in `docs/register-map.md`.
 A single-bench ICS security training rig that simulates a residential **smart meter**
 and a **firmware-update-over-RF** attack path, for use in a hands-on cyber exercise.
 
-- An **Arduino Opta PLC** runs a smart-meter simulation and serves **Modbus TCP**.
-- A **Raspberry Pi 5** (Pironman 5 case) hosts **SCADA-LTS**, which polls the Opta and
-  renders an operator view: a green/red power indicator and a live voltage/usage meter.
-- A **LoRa HAT** (Waveshare SX1262) on the Pi is the simulated update channel. A payload
-  delivered over that channel is the exploited path in the scenario.
-- The scenario outcome: the "malicious firmware update" flips the meter to a fault
-  state — indicator goes **red**, voltage/usage drop to **zero**.
+- An **Arduino Opta PLC** runs a smart-meter simulation and serves **Modbus TCP**. Its
+  **physical four-light panel** (blue/green/yellow/red) is the blue team's operator view —
+  there is no software HMI.
+- A **LoRa HAT** (Waveshare SX1262) on a **Raspberry Pi 5** (Pironman 5 case) is the simulated
+  update channel; a listener on the Pi turns a received RF payload into a Modbus write against
+  the Opta. A payload delivered over that channel is the exploited path in the scenario.
+- The scenario outcome: the "malicious firmware update" flips the meter to a fault state —
+  panel goes **red**, voltage/usage drop to **zero**.
+- A **central/facilitator node** (Kit 00, Pi `.100` / Opta `.200`) aggregates every kit's
+  status over RF and serves a fleet dashboard (see `central/`).
 
 This is an isolated training lab on owned hardware. The "attack" is a Modbus register
 write against a simulated meter — there is no real infrastructure and no weaponized code.
@@ -24,11 +27,12 @@ write against a simulated meter — there is no real infrastructure and no weapo
 ## Architecture (data flow)
 
 ```
-[2nd LoRa node]  --------RF payload-------->  [Pi: update listener]
+[drone / 2nd LoRa node]  ----RF payload---->  [Pi: update listener]
                                                         | writes FW_MODE (Modbus)
                                                         v
-[Opta PLC: smart-meter sim + Modbus TCP server]  <---- polls ----  [Pi: SCADA-LTS view]
-        ^ drives POWER_STATUS / VOLTAGE / POWER_W                   green light + meter
+[Opta PLC: smart-meter sim + Modbus TCP server]  ----> physical 4-light panel (operator view)
+        drives POWER_STATUS / VOLTAGE / POWER_W
+        field kits also beacon status over RF ----> [Kit 00 central node: collector + dashboard]
 ```
 
 ## The contract (source of truth: `docs/register-map.md`)
@@ -60,29 +64,28 @@ use a reserved internal-flash sector via `FlashIAP`, bench-tested first.)
 ## Repo layout
 
 - `opta/`     — Opta smart-meter Arduino sketch (`smart_meter/`) + prebuilt firmware (`firmware/`) + factory backup (`backup/`)
-- `scada/`    — SCADA-LTS deployment (docker-compose, ARM64) + `emport-config.json` + `emport.py` (headless Emport)
 - `listener/` — field-kit Pi service: LoRa (serial) -> Modbus write; also **beacons kit status**
-- `central/` — facilitator **fleet console**: `collector.py` (aggregates status beacons + local Kit 00 meter) + `fleet.html` live dashboard
+- `central/` — facilitator **fleet console**: `collector.py` (aggregates status beacons + local Kit 00 meter) + `fleet.html` live dashboard + `smartmeter-collector.service`
 - `drone/`    — RF injection experiments (`beacon/` dead end, `rxsweep/` diagnostic — see `drone/README.md`)
-- `provision/`— kit build/replication: `provision.sh` (golden kit), `kit_init.sh` (per clone), `hat_config.py`, `opta_flash.sh`
+- `provision/`— per-kit build: `provision.sh` (build one kit), `hat_config.py`, `opta_flash.sh`, `patch_ip.py`, `authorized_keys`
 - `scripts/`  — test/helper scripts (Modbus poll, trip inject, reset)
 - `docs/`     — `register-map.md` (contract), `architecture.md`
 
-Kit replication (1 -> 45): **isolated islands, per-kit addressing** — see `PROVISION.md`. Kit N
--> Pi `192.168.1.(100+N)`, Opta `192.168.1.(200+N)`. Golden SD image + per-clone
-`sudo provision/kit_init.sh <N>` (Pi IP, SSH keys, HAT config, and flashes the Opta with its IP
-stamped into the firmware — one prebuilt `.bin` serves all kits via a patchable `KITCFGv1`
-marker; SCADA + listener are pointed at the kit's Opta IP too). RF is the cross-kit attack path;
-unique IPs mean the OT switches *may* be bridged for management if wanted.
+Kit replication (1 -> 45): **isolated islands, per-kit addressing, built one at a time** — see
+`PROVISION.md`. Kit N -> Pi `192.168.1.(100+N)`, Opta `192.168.1.(200+N)`. **No golden image:**
+on each kit, git clone the repo and run `sudo provision/provision.sh <N>` — it sets the Pi IP,
+installs SSH keys, configures the HAT, installs the listener service pointed at **this kit's**
+Opta, and flashes the Opta with its IP stamped into the firmware (one prebuilt `.bin` serves all
+kits via a patchable `KITCFGv1` marker). RF is the cross-kit attack path; unique IPs mean the OT
+switches *may* be bridged for management if wanted.
 
 ## Tech stack
 
 - Opta: **Arduino sketch** (`arduino:mbed_opta` core + ArduinoModbus), Modbus TCP server,
   static IP, flashed over USB via `arduino-cli`. (The PLC IDE / IEC 61131-3 path was
   abandoned — its online link would not connect on this bench; see `opta/README.md`.)
-- Pi 5: Raspberry Pi OS (64-bit / ARM64), Docker + Docker Compose.
-- SCADA-LTS: `scadalts/scadalts` image + a database container (see ARM64 note below).
-- Listener: Python 3 (pyserial + the dependency-free `scripts/mb.py` Modbus client).
+- Pi 5: Raspberry Pi OS (64-bit / ARM64); no external services (no Docker).
+- Listener / collector: Python 3 (pyserial + the dependency-free `scripts/mb.py` Modbus client).
 
 ## Rules
 
@@ -100,9 +103,6 @@ unique IPs mean the OT switches *may* be bridged for management if wanted.
 
 ## Environment notes / gotchas
 
-- **ARM64 database (resolved):** current `scadalts/scadalts` and `mysql/mysql-server:8.0.32`
-  are **native multi-arch (arm64)** — no emulation, no MySQL-5.7 workaround. `scada/`
-  pins those tags and runs natively on the Pi 5. (The old "budget time here" worry is moot.)
 - **Serial for LoRa:** enable the serial hardware and disable the login shell so the
   SX1262 HAT gets a clean `/dev/ttyAMA0` on the Pi 5. **Address `/dev/ttyAMA0` directly, not
   `/dev/serial0`.** On Bookworm `serial0`→`ttyAMA0` (the RP1 header UART), but on **Debian 13
@@ -120,9 +120,10 @@ unique IPs mean the OT switches *may* be bridged for management if wanted.
   across the full SF/BW×sync grid → **0 reception**; this matches documented experience
   (RadioLib #1612) and is unfixable by any PHY setting. Full write-up + the diagnostic sketch:
   `drone/README.md` and `drone/rxsweep/`.
-- SCADA-LTS login is **intentionally left `admin/admin`** for this exercise — a planted
-  default-credential weakness for the defenders to discover and flag. (Change it only if this
-  rig ever leaves the isolated lab.)
+- **Planted weaknesses (deliberate — don't "fix" them):** the RF update channel is
+  **unauthenticated** (anyone can forge a valid-looking `SMFW` frame — the exercise's core
+  lesson), and SSH + a shared management key are baked into provisioning for the isolated lab.
+  Don't ship either outside the lab.
 - **Opta Modbus server wedges on an eth0 link bounce.** The sketch's ArduinoModbus TCP server is
   blocking single-client with no TCP keepalive, so if a Pi's eth0 IP changes / cable replugs / NM
   reactivates, the abandoned (no-FIN) connection keeps `client.connected()` true and the Opta stays
@@ -134,9 +135,16 @@ unique IPs mean the OT switches *may* be bridged for management if wanted.
 
 - [x] Phase 1 — Opta smart-meter program + Modbus TCP server (Arduino **sketch**, not PLC IDE — see `opta/README.md`)
 - [x] Phase 2 — Verify Modbus (read + trip + reset confirmed via `mbpoll` and `scripts/mb_*.py`; run from the Pi to reconfirm)
-- [x] Phase 3 — SCADA-LTS on the Pi (Docker, native arm64) + Modbus data source (5 points, verified vs `mb_read.py`; attack→reset reflected in SCADA)
-- [x] Phase 4 — Graphical operator view (green/red indicator + voltage gauge + usage); attack/reset reflected live in SCADA
-- [~] Phase 5 — RF update listener: **LoRa half built + validated** (`listener/`: SX1262 868M UART HAT alive + TX on the Pi; malicious frame → `FW_MODE=1` trip proven via `--simulate`). Remaining: real over-the-air. **The 2nd node MUST be another EBYTE/Waveshare UART HAT** — a raw-SX1262 ESP32 (Heltec) drone was tried and is a **dead end** (see `drone/README.md`)
-- [ ] Phase 6 — End-to-end trip + reset, then real RF delivery
+- [—] Phase 3–4 — **DESCOPED.** SCADA-LTS software operator view was built and working, then
+  removed from scope: the blue team uses the Opta's **physical four-light panel** as the operator
+  view. No software HMI, no Docker on the kits. (`scada/` deleted.)
+- [x] Phase 5 — RF update listener + LoRa flood mesh: **built + validated over the air** (`listener/`).
+  Real 2-kit trip proven (drone HAT → kit's listener → `FW_MODE` write → meter faults). Two attack
+  modes (TEST / EXERCISE LOCK). **The 2nd node MUST be another EBYTE/Waveshare UART HAT** — a
+  raw-SX1262 ESP32 (Heltec) drone is a **dead end** (see `drone/README.md`).
+- [x] Phase 6 — End-to-end trip + reset over real RF (2-kit mesh test passed).
+- [~] Central node — Kit 00 collector + fleet dashboard + RSSI range-map built (`central/`); drone
+  data-mule for out-of-range kits still TODO.
+- [ ] Replication — build out kits 1–45 per `PROVISION.md` (per-kit `provision.sh <N>`).
 
-Update this checklist as phases land.
+Update this checklist as work lands.
