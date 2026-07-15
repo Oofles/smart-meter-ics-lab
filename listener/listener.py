@@ -13,6 +13,7 @@ mode — no Meshtastic, no new hardware.
   ./listener.py                          # be a mesh node: receive, apply, relay
   ./listener.py --send malicious         # inject a TEST update (drone) — operator RESET clears it
   ./listener.py --send malicious --exercise  # inject an EXERCISE LOCK — RESET disabled, persists
+  ./listener.py --send malicious --loop  # drone "execution mode": re-inject every --interval s
   ./listener.py --send benign
   ./listener.py --simulate malicious     # NO radio: exercise apply+relay logic
 """
@@ -106,6 +107,12 @@ def main():
     ap.add_argument("--host", default=mb.DEFAULT_HOST, help="this node's Opta Modbus host")
     ap.add_argument("--send", choices=["malicious", "benign", "reset"], help="inject an update over LoRa (the drone); 'reset' = facilitator recovery (FW_MODE:=0 everywhere)")
     ap.add_argument("--ttl", type=int, default=DEFAULT_TTL, help="hop limit for --send")
+    ap.add_argument("--loop", action="store_true",
+                    help="with --send: drone execution mode — keep re-injecting (a fresh msg_id "
+                         "each pass, so kits newly in range trip too) every --interval seconds "
+                         "until Ctrl-C, holding the radio open the whole time")
+    ap.add_argument("--interval", type=float, default=5.0,
+                    help="seconds between injections in --loop mode (default 5)")
     ap.add_argument("--exercise", action="store_true",
                     help="with malicious --send/--simulate: EXERCISE LOCK (FW_MODE=2 — operator RESET "
                          "disabled; clear only with a direct FW_MODE:=0 write). Default is TEST.")
@@ -133,13 +140,19 @@ def main():
     try:
         if args.send:
             t = fw_type(args.send)
-            mid = random.randint(0, 0xFFFF)
-            frame = protocol.build(t, mid, args.ttl)
-            _seen.add(mid)                            # don't relay our own injection
-            print("INJECT (drone) msg_id=0x%04X ttl=%d:" % (mid, args.ttl), frame.hex(" "))
-            lora.send(frame)
-            time.sleep(0.2)
-            return
+            n = 0
+            while True:
+                n += 1
+                mid = random.randint(0, 0xFFFF)   # fresh id each pass -> newly-in-range kits act too
+                frame = protocol.build(t, mid, args.ttl)
+                _seen.add(mid)                        # don't act on / relay our own injection
+                tag = "#%d " % n if args.loop else ""
+                print("INJECT (drone) %smsg_id=0x%04X ttl=%d:" % (tag, mid, args.ttl), frame.hex(" "))
+                lora.send(frame)
+                time.sleep(0.2)
+                if not args.loop:
+                    return
+                time.sleep(max(0.0, args.interval - 0.2))
         kit_id = args.kit if args.kit is not None else derive_kit_id(args.host)
         print("mesh node K%02d: listening on LoRa (%s), beaconing status ttl=1 — Ctrl-C to stop"
               % (kit_id, lora.ser.port))

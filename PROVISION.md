@@ -124,8 +124,16 @@ Inject the actual attack from the drone:
 ```bash
 cd listener && python3 listener.py --send malicious            # TEST trip (operator RESET clears it)
                 python3 listener.py --send malicious --exercise # EXERCISE LOCK (RESET disabled)
+                python3 listener.py --send malicious --loop      # execution mode: re-inject every --interval s
                 python3 listener.py --send reset                # facilitator recovery: FW_MODE:=0 everywhere
 ```
+
+`--loop` is the roaming "keep delivering" mode (fresh `msg_id` each pass so newly-in-range kits
+trip). The link is blind broadcast — no ACK, the drone stores no per-kit state — so to see what
+an injection hit, run **`python3 scripts/rf_sniff.py`** on the drone (passive; decodes the target
+kits' `SMST` beacons flipping to `FW_MODE=1`). Central-side, the same beacons drive the Kit 00
+dashboard. (A drone that *carries* out-of-range kits' beacons back to Kit 00 — the "data-mule" —
+builds on `rf_sniff.py` and is still TODO.)
 
 Hardware: the drone **must** be a 2nd EBYTE/Waveshare SX1262 **UART** HAT on the GOLDEN config —
 a raw-SX1262 board (Heltec/RadioLib) does **not** interoperate (see `drone/README.md`). The

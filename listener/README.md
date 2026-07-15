@@ -40,8 +40,16 @@ the channel is unauthenticated (the lesson).
 ./listener.py                      # be a mesh node: receive → apply → relay
 ./listener.py --send malicious     # the "drone": inject an update over LoRa
 ./listener.py --send malicious --ttl 4
+./listener.py --send malicious --loop --interval 5   # drone execution mode: re-inject every 5s
 ./listener.py --simulate malicious # NO radio: exercise apply+relay (any host on the LAN)
 ```
+
+**Drone execution mode** (`--loop`): keeps the radio open and re-injects every `--interval`
+seconds until Ctrl-C, with a **fresh `msg_id` each pass** — so a kit that comes into range
+after the first shot still trips (a reused id would be deduped and ignored). This is how a
+roaming drone "keeps trying to deliver" as it passes meters. The RF link is blind broadcast
+(no ACK), so the drone never knows who heard it — watch results with `scripts/rf_sniff.py`
+(target kits' `SMST` beacons flip to `FW_MODE=1`) or on the Kit 00 dashboard.
 
 `--host` sets this node's Opta (default `192.168.1.210`); on a real fleet each kit's
 listener points at its own Opta.
