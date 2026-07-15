@@ -173,7 +173,7 @@ Config knobs (`/etc/default/smartmeter-drone`):
 |-----|---------|---------|
 | `DRONE_SEND` | `malicious` | `malicious` = attack; `benign` = harmless heartbeat (safe dry run) |
 | `DRONE_MODE` | *(empty)* | empty = **TEST** trip (RESET clears); `--exercise` = **EXERCISE LOCK** — *set this before exercise day* |
-| `DRONE_TTL` | `1` | `1` = direct-range kits only; raise to flood out-of-range via relays |
+| `DRONE_TTL` | `3` | floods out-of-range kits via relays (one flyby propagates the mesh); set `1` for direct-range only |
 | `DRONE_INTERVAL` | `5` | seconds between re-injections while flying |
 | `DRONE_DELAY` | `60` | launch countdown before the first injection |
 

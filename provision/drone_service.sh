@@ -49,8 +49,9 @@ DRONE_SEND=malicious
 DRONE_MODE=
 
 # Hop limit. 1 = trip only kits in the drone's DIRECT range as it passes (no mesh relay).
-# Raise (2-3) to also flood out-of-range kits via neighbours' relays.
-DRONE_TTL=1
+# 3 (default) also floods out-of-range kits via neighbours' relays so one flyby propagates
+# across the mesh; drop to 1 for direct-range-only delivery.
+DRONE_TTL=3
 
 # Seconds between re-injections while flying (fresh msg_id each pass -> newly-in-range kits trip).
 DRONE_INTERVAL=5
