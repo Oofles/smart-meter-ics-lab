@@ -131,10 +131,18 @@ def _record_status(frame, rssi):
     kid = info["kit_id"]
     if kid == 0 or kid > N_KITS:
         return
+    relayed = info["version"] >= protocol.STATUS_VER_RELAYED   # re-emitted by the drone data-mule
+    now = time.monotonic()
     with _lock:
-        _fleet[kid] = {"fw": info["fw_mode"], "rssi": rssi, "last": time.monotonic()}
-    print("  RX beacon K%02d FW_MODE=%d%s" %
-          (kid, info["fw_mode"], "" if rssi is None else " %d dBm" % rssi))
+        prev = _fleet.get(kid)
+        # a directly-heard beacon is ground truth; don't let a (possibly older) muled copy
+        # overwrite a kit the collector can hear itself
+        if relayed and prev and not prev.get("relayed") and now - prev["last"] <= STALE_SEC:
+            return
+        _fleet[kid] = {"fw": info["fw_mode"], "rssi": None if relayed else rssi,
+                       "last": now, "relayed": relayed}
+    print("  RX beacon K%02d FW_MODE=%d%s" % (kid, info["fw_mode"],
+          " (via mule)" if relayed else ("" if rssi is None else " %d dBm" % rssi)))
 
 
 # ---------------------------------------------------------------- local Opta (Kit 00)
@@ -181,12 +189,13 @@ def node_json(kid, now):
         rec = _fleet.get(kid)
     if rec is None:
         return {"id": kid, "central": False, "state": "unknown", "fw": None,
-                "rssi": None, "last": None, "meter": None}
+                "rssi": None, "last": None, "relayed": False, "meter": None}
     age = round(now - rec["last"])
     stale = age > STALE_SEC
     return {"id": kid, "central": False,
             "state": "unknown" if stale else fw_state(rec["fw"]),
-            "fw": rec["fw"], "rssi": rec["rssi"], "last": age, "meter": None}
+            "fw": rec["fw"], "rssi": rec["rssi"], "last": age,
+            "relayed": rec.get("relayed", False), "meter": None}
 
 
 def snapshot():

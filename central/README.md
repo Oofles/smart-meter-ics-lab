@@ -15,7 +15,9 @@ The **central node** is the facilitator's setup: a Pi + SX1262 HAT + its own Opt
 Each field kit's `listener.py` **beacons** its state over LoRa — a tiny `SMST` frame
 (`kit_id + FW_MODE`), sent on a ~20 s heartbeat **and immediately on any state change**,
 at **`ttl=1`** (direct only — no relay storm). The collector hears whatever is in range;
-kits out of range show **Unknown** until the **drone mules** their status back (planned).
+a kit out of range shows **Unknown** until the **drone data-mule** (`scripts/datamule.py`)
+carries its last-known beacon back within reach — those show **"via mule"** with no RSSI (the
+state is second-hand; a beacon the collector hears directly always wins over a muled copy).
 RSSI is measured by the collector's radio — enable the HAT's RSSI-append bit on **this
 node only** with `sudo python3 provision/hat_config.py --rssi` (field kits stay on plain
 golden; it's a receive-side setting, same PHY, so they still interoperate). The module
@@ -84,6 +86,6 @@ journalctl -u smartmeter-collector -f          # watch beacons land
   collector reads the trailing byte and reports dBm. Validated over the air (K09 ≈ −10…−32 dBm on the bench).
 - [x] `smartmeter-collector.service` unit (this dir) — installed + enabled on the central
   node (`.100`); survives reboot, RX lines live in `journalctl`.
-- [ ] **Drone mule** — drone logs `{kit, state, time}` per sortie and uploads to the
-  collector when back in range, resolving out-of-range (Unknown) kits.
+- [x] **Drone mule** — `scripts/datamule.py`: the drone buffers out-of-range kits' `SMST`
+  beacons and re-emits them (version=2) so the collector resolves them as **"via mule"**.
 - [ ] Fold the central-node setup (HAT `--rssi`, this service) into provisioning.

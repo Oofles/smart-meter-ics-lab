@@ -143,10 +143,12 @@ switches *may* be bridged for management if wanted.
   modes (TEST / EXERCISE LOCK). **The 2nd node MUST be another EBYTE/Waveshare UART HAT** — a
   raw-SX1262 ESP32 (Heltec) drone is a **dead end** (see `drone/README.md`).
 - [x] Phase 6 — End-to-end trip + reset over real RF (2-kit mesh test passed).
-- [~] Central node — Kit 00 collector + fleet dashboard + RSSI range-map built (`central/`); drone
-  data-mule for out-of-range kits still TODO.
+- [x] Central node — Kit 00 collector + fleet dashboard + RSSI range-map built (`central/`); drone
+  data-mule for out-of-range kits done (`scripts/datamule.py` → "via mule" on the dashboard).
 - [x] Drone / injection node — dedicated attacker build (`provision/drone.sh`: no Opta, no listener
-  service). Bench drone = Pi 5 `.140`; OTA validated (trip + reset vs live kits over RF). Pi Zero backup builds the same way.
+  service). Bench drone = Pi 5 `.140`; OTA validated (trip + reset vs live kits over RF). Pi Zero backup
+  builds the same way. Drone tooling: `--send --loop` execution mode, `scripts/rf_sniff.py` monitor,
+  `scripts/datamule.py` store-and-forward mule.
 - [ ] Replication — build out kits 1–45 per `PROVISION.md` (per-kit `provision.sh <N>`).
 
 Update this checklist as work lands.

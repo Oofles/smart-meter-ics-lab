@@ -240,7 +240,9 @@
   function tileInner(n){
     const bars=rssiBars(n.rssi);
     const barsHtml=[0,1,2,3].map(b=>`<i class="${b<bars?'lit':''}"></i>`).join("");
-    const dbm = n.central ? "local" : (n.rssi===null||n.rssi===undefined ? (n.state==="unknown"?"no signal":"—") : n.rssi+" dBm");
+    const dbm = n.central ? "local"
+      : (n.relayed && n.state!=="unknown") ? "via mule"
+      : (n.rssi===null||n.rssi===undefined ? (n.state==="unknown"?"no signal":"—") : n.rssi+" dBm");
     return `<div class="top"><span class="id"><small>K</small>${String(n.id).padStart(2,"0")}</span>
         <span class="seen">${n.central?"live":seenTxt(n.last)}</span></div>
       <span class="pill s-${n.state}">${PILL[n.state]}</span>
@@ -281,6 +283,7 @@
     let link;
     if (n.central) link = `<div class="drssi"><span class="dbm" style="font-size:13px">USB / local Modbus — no RF hop</span></div>`;
     else if (n.state==="unknown") link = `<div class="drssi"><span class="dbm" style="font-size:13px">no telemetry — last heard ${seenTxt(n.last)}</span></div>`;
+    else if (n.relayed) link = `<div class="drssi"><span class="dbm" style="font-size:13px">via drone mule · carried ${seenTxt(n.last)} — no direct RF</span></div>`;
     else link = `<div class="drssi"><span class="bars" style="height:16px">${[0,1,2,3].map(b=>`<i class="${b<rssiBars(n.rssi)?'lit':''}"></i>`).join("")}</span>
         <b style="font-family:var(--mono)">${n.rssi===null||n.rssi===undefined?"—":n.rssi+" dBm"}</b><span class="dbm">· ${seenTxt(n.last)}</span></div>`;
 

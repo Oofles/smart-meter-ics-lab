@@ -132,8 +132,19 @@ cd listener && python3 listener.py --send malicious            # TEST trip (oper
 trip). The link is blind broadcast — no ACK, the drone stores no per-kit state — so to see what
 an injection hit, run **`python3 scripts/rf_sniff.py`** on the drone (passive; decodes the target
 kits' `SMST` beacons flipping to `FW_MODE=1`). Central-side, the same beacons drive the Kit 00
-dashboard. (A drone that *carries* out-of-range kits' beacons back to Kit 00 — the "data-mule" —
-builds on `rf_sniff.py` and is still TODO.)
+dashboard.
+
+**Data-mule** (`scripts/datamule.py`): a roaming drone hears kits that are out of the central
+collector's range, buffers their `SMST` beacons, and re-emits them (marked relayed) so Kit 00
+resolves those kits as **"via mule"** on the dashboard when the drone passes back in range:
+
+```bash
+sudo python3 scripts/datamule.py                      # listen + forward buffered beacons every 15s
+sudo python3 scripts/datamule.py --forward-interval 10 --expire 300
+```
+
+Store-and-forward only (STATUS, not attacks); a beacon Kit 00 hears directly always wins over a
+muled copy, so running the mule near in-range kits is harmless.
 
 Hardware: the drone **must** be a 2nd EBYTE/Waveshare SX1262 **UART** HAT on the GOLDEN config —
 a raw-SX1262 board (Heltec/RadioLib) does **not** interoperate (see `drone/README.md`). The

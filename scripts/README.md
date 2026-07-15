@@ -15,3 +15,6 @@ Keep these dependency-light (the stdlib `mb.py` client) so they run anywhere on 
   timestamps; **transmits nothing**. Run it on the **drone** to see what an injection did
   (target kits' beacons flip to `FW_MODE=1`), or anywhere to watch fleet RF. `--rssi` parses
   the appended RSSI byte if this HAT was set with `hat_config.py --rssi`. Deps: pyserial, lgpio.
+- `datamule.py` — drone **store-and-forward**: buffers out-of-range kits' `SMST` beacons and
+  re-emits them (marked relayed, version=2) so the Kit 00 collector resolves those kits as
+  "via mule" on the dashboard. STATUS only; direct beacons win over muled copies. Deps: pyserial, lgpio.

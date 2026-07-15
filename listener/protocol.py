@@ -58,8 +58,15 @@ def parse(frame: bytes) -> dict:
 # receiver (the collector) from the radio, not known to the sender.
 #
 # Frame (9 bytes):  b"SMST" | version(1) | kit_id(1) | fw_mode(1) | crc16(2 BE)
+#
+# version distinguishes a first-hand beacon (1, sent by the kit itself) from one the
+# drone DATA-MULE re-emitted on a kit's behalf (STATUS_VER_RELAYED) — carrying an
+# out-of-range kit's last-known state back within reach of the central collector. The
+# collector uses this to avoid showing a bogus direct-RSSI for a second-hand beacon.
 MAGIC_STATUS = b"SMST"
 STATUS_LEN = 9
+STATUS_VER_FIRSTHAND = 1
+STATUS_VER_RELAYED = 2   # re-emitted by the drone data-mule (see scripts/datamule.py)
 
 
 def build_status(kit_id: int, fw_mode: int, version: int = 1) -> bytes:
