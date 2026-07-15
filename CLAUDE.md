@@ -148,7 +148,8 @@ switches *may* be bridged for management if wanted.
 - [x] Drone / injection node — dedicated attacker build (`provision/drone.sh`: no Opta, no listener
   service). Bench drone = Pi 5 `.140`; OTA validated (trip + reset vs live kits over RF). Pi Zero backup
   builds the same way. Drone tooling: `--send --loop` execution mode, `scripts/rf_sniff.py` monitor,
-  `scripts/datamule.py` store-and-forward mule.
+  `scripts/datamule.py` store-and-forward mule, and `provision/drone_service.sh` (boot-armed
+  autonomous payload via `smartmeter-drone.service` + `/etc/default/smartmeter-drone`).
 - [ ] Replication — build out kits 1–45 per `PROVISION.md` (per-kit `provision.sh <N>`).
 
 Update this checklist as work lands.

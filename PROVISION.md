@@ -146,6 +146,37 @@ sudo python3 scripts/datamule.py --forward-interval 10 --expire 300
 Store-and-forward only (STATUS, not attacks); a beacon Kit 00 hears directly always wins over a
 muled copy, so running the mule near in-range kits is harmless.
 
+### Launching the drone (autonomous, boot-armed)
+
+The deployed drone is headless and off the network, so it self-starts from a **systemd boot
+service** — no SSH at launch. Install it once with **`sudo provision/drone_service.sh`**; the
+payload/timing live in **`/etc/default/smartmeter-drone`** (a one-line change swaps TEST → LOCK).
+
+**Installed DISABLED on purpose** — a normal boot does nothing, so bench setup never fires an
+attack. Enabling it is the deliberate "arm for the field" step:
+
+```bash
+sudo provision/drone_service.sh                 # install unit + config (disabled)
+sudo systemctl start smartmeter-drone           # test now: honors the countdown, then loops
+journalctl -u smartmeter-drone -f               # watch: ARM countdown -> INJECT #1, #2, ...
+sudo systemctl enable smartmeter-drone          # ARM: run on every boot (do this for the field)
+sudo systemctl disable smartmeter-drone         # DISARM: back to inert boots
+```
+
+Field use: arm it (`enable`), then **just power the Pi on at the launch point** — it waits
+`DRONE_DELAY` seconds (default 60, the window to get it airborne) and starts the injection loop.
+Recover the kits afterward with `listener.py --send reset` (drone or Kit 00 console).
+
+Config knobs (`/etc/default/smartmeter-drone`):
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `DRONE_SEND` | `malicious` | `malicious` = attack; `benign` = harmless heartbeat (safe dry run) |
+| `DRONE_MODE` | *(empty)* | empty = **TEST** trip (RESET clears); `--exercise` = **EXERCISE LOCK** — *set this before exercise day* |
+| `DRONE_TTL` | `1` | `1` = direct-range kits only; raise to flood out-of-range via relays |
+| `DRONE_INTERVAL` | `5` | seconds between re-injections while flying |
+| `DRONE_DELAY` | `60` | launch countdown before the first injection |
+
 Hardware: the drone **must** be a 2nd EBYTE/Waveshare SX1262 **UART** HAT on the GOLDEN config —
 a raw-SX1262 board (Heltec/RadioLib) does **not** interoperate (see `drone/README.md`). The
 backup drone (Pi Zero) is built with the exact same `drone.sh`.

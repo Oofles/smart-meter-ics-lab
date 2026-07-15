@@ -14,6 +14,7 @@ mode — no Meshtastic, no new hardware.
   ./listener.py --send malicious         # inject a TEST update (drone) — operator RESET clears it
   ./listener.py --send malicious --exercise  # inject an EXERCISE LOCK — RESET disabled, persists
   ./listener.py --send malicious --loop  # drone "execution mode": re-inject every --interval s
+  ./listener.py --send malicious --loop --start-delay 60  # ...after a 60s launch countdown
   ./listener.py --send benign
   ./listener.py --simulate malicious     # NO radio: exercise apply+relay logic
 """
@@ -32,6 +33,21 @@ DEFAULT_TTL = 3
 BEACON_SEC = 20      # status-beacon heartbeat (plus jitter); also beacons on state change
 BEACON_JITTER = 8
 _seen = set()        # msg_ids already applied / relayed by this node
+
+
+def wait_to_arm(seconds):
+    """Visible pre-launch countdown before the drone starts injecting — the window to
+    get the drone airborne/placed before the payload starts flooding."""
+    print("ARM: first injection in %ds (Ctrl-C to abort) ..." % round(seconds))
+    end = time.monotonic() + seconds
+    while True:
+        rem = end - time.monotonic()
+        if rem <= 0:
+            break
+        if rem <= 5 or round(rem) % 10 == 0:
+            print("  arming in %ds ..." % round(rem))
+        time.sleep(1)
+    print("ARM: go.")
 
 
 def derive_kit_id(host):
@@ -113,6 +129,9 @@ def main():
                          "until Ctrl-C, holding the radio open the whole time")
     ap.add_argument("--interval", type=float, default=5.0,
                     help="seconds between injections in --loop mode (default 5)")
+    ap.add_argument("--start-delay", type=float, default=0.0,
+                    help="with --send: wait this many seconds (visible countdown) before the FIRST "
+                         "injection — the window to launch the drone before it starts. Default 0.")
     ap.add_argument("--exercise", action="store_true",
                     help="with malicious --send/--simulate: EXERCISE LOCK (FW_MODE=2 — operator RESET "
                          "disabled; clear only with a direct FW_MODE:=0 write). Default is TEST.")
@@ -140,6 +159,8 @@ def main():
     try:
         if args.send:
             t = fw_type(args.send)
+            if args.start_delay > 0:
+                wait_to_arm(args.start_delay)
             n = 0
             while True:
                 n += 1
