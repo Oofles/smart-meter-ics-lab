@@ -45,6 +45,10 @@ ESP32/Arduino wired to an EBYTE E22-**T** module — *not* a bare SX1262). EBYTE
 mode is exactly what `listener/protocol.py` targets. Inject with `listener.py --send malicious`
 from that node.
 
+**Building the drone Pi:** run `sudo provision/drone.sh` on it (no Opta, no listener service —
+see PROVISION.md "The drone / injection node"). The current bench drone is a Pi 5 at
+`192.168.1.140`; a Pi Zero built the same way is the backup.
+
 ## Contents
 
 - **`beacon/beacon.ino`** — the raw-SX1262 injector we *tried* (Heltec V4, RadioLib). Builds a

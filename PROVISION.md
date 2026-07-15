@@ -83,6 +83,7 @@ attached you can skip the `ssh` phase.
 | Script | Does | Notes |
 |--------|------|-------|
 | `provision.sh <kit> [phase]` | Full/partial per-kit build, phased | The whole replication method — run once per kit. |
+| `drone.sh [octet] [phase]` | Builds a Pi as the RF **drone**/injection node (no Opta, no listener service) | The attacker node — see "The drone" below. Also converts an old field kit into a drone. |
 | `hat_config.py` | Writes the HAT to the golden config (ch 18 / 868.125 MHz, air-rate 2.4k, transparent) + verifies | `--read` to inspect only; `--rssi` (central node only) enables the RSSI-append byte. |
 | `opta_flash.sh <octet>` | Stamps this kit's IP into the firmware (`patch_ip.py`), then flashes from the Pi via `dfu-util` (1200-baud touch → DFU → 0x08040000) | No Arduino toolchain on the Pi; Opta must be on Pi USB. |
 | `patch_ip.py` | Rewrites the `KITCFGv1` IP-marker octet in a copy of the `.bin` | so one firmware serves every kit |
@@ -98,6 +99,37 @@ regenerate + commit after any Opta change, then each kit's build flashes the cur
 python3 provision/hat_config.py --read     # HAT: 00 00 00 62 00 12 03 00 00
 python3 scripts/mb_read.py 192.168.1.20N   # Opta: healthy, dial voltage, panel state
 ```
+
+## The drone / injection node
+
+The **drone** is the attacker: it transmits malicious firmware-update frames over LoRa; every
+field kit in range hears them, trips its own meter (`FW_MODE` over Modbus), and flood-relays.
+Build it with **`drone.sh`**, not `provision.sh` — the drone has **no Opta** (nothing to flash),
+runs **no listener service** (it injects on demand, so it neither beacons nor holds the radio),
+and its wired IP is optional (it serves nothing; the IP is only for facilitator SSH).
+
+```bash
+# on the drone Pi, repo cloned:
+sudo provision/drone.sh            # full build, leaves wired IP as-is
+sudo provision/drone.sh 50         # ... and set the wired IP to 192.168.1.50
+sudo provision/drone.sh hat        # re-run just the HAT config after fixing jumpers
+```
+
+Phases: `system serial net ssh undo-kit hat verify` (`undo-kit` disables a leftover
+`smartmeter-listener` if this Pi had been built as a field kit; `net` is a no-op without an
+octet). `verify` reads the HAT and fires a **benign** frame to prove the TX path (no trip).
+
+Inject the actual attack from the drone:
+
+```bash
+cd listener && python3 listener.py --send malicious            # TEST trip (operator RESET clears it)
+                python3 listener.py --send malicious --exercise # EXERCISE LOCK (RESET disabled)
+                python3 listener.py --send reset                # facilitator recovery: FW_MODE:=0 everywhere
+```
+
+Hardware: the drone **must** be a 2nd EBYTE/Waveshare SX1262 **UART** HAT on the GOLDEN config —
+a raw-SX1262 board (Heltec/RadioLib) does **not** interoperate (see `drone/README.md`). The
+backup drone (Pi Zero) is built with the exact same `drone.sh`.
 
 ## RF at scale (single shared channel — "one shot trips everyone")
 
