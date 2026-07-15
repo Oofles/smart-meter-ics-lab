@@ -145,6 +145,8 @@ switches *may* be bridged for management if wanted.
 - [x] Phase 6 — End-to-end trip + reset over real RF (2-kit mesh test passed).
 - [~] Central node — Kit 00 collector + fleet dashboard + RSSI range-map built (`central/`); drone
   data-mule for out-of-range kits still TODO.
+- [x] Drone / injection node — dedicated attacker build (`provision/drone.sh`: no Opta, no listener
+  service). Bench drone = Pi 5 `.140`; OTA validated (trip + reset vs live kits over RF). Pi Zero backup builds the same way.
 - [ ] Replication — build out kits 1–45 per `PROVISION.md` (per-kit `provision.sh <N>`).
 
 Update this checklist as work lands.
