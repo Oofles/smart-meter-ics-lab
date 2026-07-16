@@ -84,7 +84,7 @@ attached you can skip the `ssh` phase.
 |--------|------|-------|
 | `provision.sh <kit> [phase]` | Full/partial per-kit build, phased | The whole replication method — run once per kit. |
 | `drone.sh [octet] [phase]` | Builds a Pi as the RF **drone**/injection node (no Opta, no listener service) | The attacker node — see "The drone" below. Also converts an old field kit into a drone. |
-| `hat_config.py` | Writes the HAT to the golden config (ch 18 / 868.125 MHz, air-rate 2.4k, transparent) + verifies | `--read` to inspect only; `--rssi` (central node only) enables the RSSI-append byte. |
+| `hat_config.py` | Writes the HAT to the golden config (ch 65 / 915.125 MHz, air-rate 2.4k, transparent) + verifies | `--read` to inspect only; `--rssi` (central node only) enables the RSSI-append byte. |
 | `opta_flash.sh <octet>` | Stamps this kit's IP into the firmware (`patch_ip.py`), then flashes from the Pi via `dfu-util` (1200-baud touch → DFU → 0x08040000) | No Arduino toolchain on the Pi; Opta must be on Pi USB. |
 | `patch_ip.py` | Rewrites the `KITCFGv1` IP-marker octet in a copy of the `.bin` | so one firmware serves every kit |
 | `authorized_keys` | Management SSH public keys installed on every kit | add facilitator keys here |
@@ -183,7 +183,7 @@ backup drone (Pi Zero) is built with the exact same `drone.sh`.
 
 ## RF at scale (single shared channel — "one shot trips everyone")
 
-All kits on channel 18 in one venue = one broadcast domain: a single drone injection reaches
+All kits on channel 65 in one venue = one broadcast domain: a single drone injection reaches
 every in-range kit directly. Inject with **`--ttl 1`** so nodes trip on direct reception and
 do **not** rebroadcast (45 relayers would storm the channel). The mesh relay only matters if
 the venue is large enough that some kits are out of the drone's range.

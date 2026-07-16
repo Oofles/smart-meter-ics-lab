@@ -30,8 +30,9 @@ Zero *reception* (not garbled packets) in both directions = the receiver never e
 a valid preamble+sync, i.e. the signals aren't mutually decodable at the PHY level.
 
 Frequency was verified correct and is **not** the issue: Waveshare's channel formula is
-`850.125 + CH×1MHz`; the HAT's channel register reads `0x12` (18) → **868.125 MHz**, which the
-Heltec matched exactly.
+`850.125 + CH×1MHz`; at the time of this test the HAT's channel register read `0x12` (18) →
+**868.125 MHz**, which the Heltec matched exactly. (The lab has since moved to channel 65 /
+915.125 MHz for US 902–928 ISM compliance; the dead-end conclusion is unaffected.)
 
 This reproduces documented experience — see
 [RadioLib Discussion #1612](https://github.com/jgromes/RadioLib/discussions/1612) (a raw SX1262

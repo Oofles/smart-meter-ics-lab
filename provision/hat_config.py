@@ -2,8 +2,8 @@
 """Configure the kit's Waveshare/EBYTE SX1262 868M LoRa HAT to the lab GOLDEN config.
 
 Every kit's HAT must match, or they can't hear each other. Golden config (read off the
-reference kit): address 0/0, NETID 0, UART 9600 8N1, air-rate 2.4k, channel 18
-(= 850.125 + 18 = 868.125 MHz), transparent mode. This writes it to the HAT's NVM (C0)
+reference kit): address 0/0, NETID 0, UART 9600 8N1, air-rate 2.4k, channel 65
+(= 850.125 + 65 = 915.125 MHz, US 902–928 ISM), transparent mode. This writes it to the HAT's NVM (C0)
 and verifies by reading back (C1).
 
 Pins: M0=BCM22, M1=BCM27 on gpiochip0; UART /dev/ttyAMA0 @ 9600 (the RP1 header UART — NOT
@@ -26,7 +26,7 @@ M0, M1, CHIP = 22, 27, 0
 PORT = "/dev/ttyAMA0"
 RSSI_BIT = 0x80          # REG6 bit7: append RSSI byte after each received packet
 # 9 config registers @ addr 0: ADDH ADDL NETID REG3 REG4 CH(REG5) REG6 REG7 REG8
-GOLDEN = bytes([0x00, 0x00, 0x00, 0x62, 0x00, 0x12, 0x03, 0x00, 0x00])
+GOLDEN = bytes([0x00, 0x00, 0x00, 0x62, 0x00, 0x41, 0x03, 0x00, 0x00])
 GOLDEN_RSSI = GOLDEN[:6] + bytes([GOLDEN[6] | RSSI_BIT]) + GOLDEN[7:]  # golden + RSSI-append
 
 
@@ -42,7 +42,7 @@ def main():
     read_only = "--read" in sys.argv
     rssi = "--rssi" in sys.argv
     target = GOLDEN_RSSI if rssi else GOLDEN
-    tag = "channel 18 / 868.125 MHz, air-rate 2.4k, transparent" + (" + RSSI-append" if rssi else "")
+    tag = "channel 65 / 915.125 MHz, air-rate 2.4k, transparent" + (" + RSSI-append" if rssi else "")
     h = lgpio.gpiochip_open(CHIP)
     lgpio.gpio_claim_output(h, M0, 0)
     lgpio.gpio_claim_output(h, M1, 0)
