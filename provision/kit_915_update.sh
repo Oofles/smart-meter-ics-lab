@@ -12,7 +12,7 @@
 #   read          optional — just read back the kit's current HAT config, change nothing.
 #
 # Env overrides:
-#   KIT_USER   SSH login user on the kit           (default: pi)
+#   KIT_USER   SSH login user on the kit           (default: cs26; Kit 00 uses vivicat)
 #   KIT_KEY    path to the management private key   (default: ssh's normal resolution)
 #   KIT_REPO   repo path on the kit                 (default: /home/$KIT_USER/smart-meter-ics-lab)
 set -euo pipefail
@@ -25,7 +25,7 @@ MODE="${2:-write}"
 [[ "$KIT" =~ ^[0-9]+$ ]] && [ "$KIT" -ge 0 ] && [ "$KIT" -le 99 ] || {
   echo "usage: $0 <kit-number 0..99> [read]" >&2; exit 2; }
 
-SSH_USER="${KIT_USER:-pi}"
+SSH_USER="${KIT_USER:-cs26}"
 PI_IP="192.168.1.$((100 + KIT))"
 REMOTE_REPO="${KIT_REPO:-/home/$SSH_USER/smart-meter-ics-lab}"
 
