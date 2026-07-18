@@ -47,6 +47,12 @@ else
   echo "   no listener service present — nothing to disable"
 fi
 
+echo "-- stop the collector if it's already running (a re-run: it holds the HAT/GPIO) --"
+# Without this, a re-run's hat_config below hits a busy /dev/ttyAMA0 + M0/M1 GPIO
+# ("GPIO busy") because the previously-installed collector service owns the radio.
+sudo systemctl stop smartmeter-collector 2>/dev/null || true
+sleep 1
+
 echo "-- configure HAT: RSSI-append + demo channel $CHANNEL --"
 if ! sudo python3 "$HERE/hat_config.py" --rssi --channel "$CHANNEL"; then
   echo "   WARNING: HAT config failed — check jumpers (UART-select=B, M0/M1 caps removed)," >&2
@@ -76,7 +82,10 @@ RestartSec=5
 WantedBy=multi-user.target
 UNIT
 sudo systemctl daemon-reload
-sudo systemctl enable --now smartmeter-collector.service
+sudo systemctl enable smartmeter-collector.service
+# restart (not `enable --now`, which is a no-op on an already-running service) so a
+# re-run reliably picks up updated collector code AND the new ExecStart args.
+sudo systemctl restart smartmeter-collector.service
 
 echo
 echo "demo central up: Kit $KIT on channel $CHANNEL."
