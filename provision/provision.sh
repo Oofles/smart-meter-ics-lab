@@ -109,10 +109,15 @@ UNIT
 
 phase_hw() {
   echo "== hardware: flash this Opta ($OPTA_IP) + configure this HAT =="
+  # HAT_CHANNEL overrides the mesh channel (default = GOLDEN ch 65 / 915.125 MHz, the
+  # exercise fleet). Set HAT_CHANNEL=58 to build a kit onto the DV-demo mesh (908.125 MHz,
+  # PHY-isolated from the exercise) — see DEMO.md. Empty => hat_config.py's default (65).
+  local CH_ARG=""
+  [ -n "${HAT_CHANNEL:-}" ] && { CH_ARG="--channel $HAT_CHANNEL"; echo "   (HAT_CHANNEL=$HAT_CHANNEL -> non-default mesh channel)"; }
   # Flash the Opta first — it's the deterministic, must-succeed step. Do NOT let a HAT
   # hiccup (jumpers/antenna) abort it under 'set -e'; HAT config warns and carries on.
   sudo "$HERE/opta_flash.sh" "$OPTA_OCTET"
-  if ! with_hat sudo python3 "$HERE/hat_config.py"; then
+  if ! with_hat sudo python3 "$HERE/hat_config.py" $CH_ARG; then
     echo "   WARNING: HAT config failed — check jumpers (UART-select=B, M0/M1 caps removed)," >&2
     echo "            HAT seating, and that it's on /dev/ttyAMA0. Opta flash already succeeded;" >&2
     echo "            re-run 'sudo python3 provision/hat_config.py' after fixing." >&2

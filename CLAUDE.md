@@ -120,6 +120,14 @@ switches *may* be bridged for management if wanted.
   across the full SF/BW×sync grid → **0 reception**; this matches documented experience
   (RadioLib #1612) and is unfixable by any PHY setting. Full write-up + the diagnostic sketch:
   `drone/README.md` and `drone/rxsweep/`.
+- **Two meshes, split by channel.** The exercise fleet is on **channel 65 / 915.125 MHz**
+  (GOLDEN, the `hat_config.py` default). The **DV walk-through demo** (Kits 43–45, a separate
+  self-contained rig shown to visitors while the exercise runs) is on **channel 58 / 908.125 MHz**
+  — a different centre frequency, so it's fully **PHY-isolated**: demo payloads can't reach the
+  blue-team kits. The channel is the HAT's REG5 byte; `hat_config.py --channel N` (or
+  `HAT_CHANNEL=` to `provision.sh`) sets it, default stays 65. Demo build + isolation-verify +
+  run-book: **`DEMO.md`**; demo central/console setup: `provision/demo_central.sh`; re-channel/read
+  a built node over SSH: `provision/demo_channel_update.sh`.
 - **Planted weaknesses (deliberate — don't "fix" them):** the RF update channel is
   **unauthenticated** (anyone can forge a valid-looking `SMFW` frame — the exercise's core
   lesson), and SSH + a shared management key are baked into provisioning for the isolated lab.
@@ -151,5 +159,9 @@ switches *may* be bridged for management if wanted.
   `scripts/datamule.py` store-and-forward mule, and `provision/drone_service.sh` (boot-armed
   autonomous payload via `smartmeter-drone.service` + `/etc/default/smartmeter-drone`).
 - [ ] Replication — build out kits 1–45 per `PROVISION.md` (per-kit `provision.sh <N>`).
+- [ ] DV demo — separate 3-kit rig (Kits 43–45) on an isolated mesh (**ch 58 / 908.125 MHz**) so
+  it can't touch the live exercise (ch 65); Kit 43 = central + dashboard + RF console. Built out
+  in `DEMO.md` (`HAT_CHANNEL=58 provision.sh`, `provision/demo_central.sh`,
+  `provision/demo_channel_update.sh`); tooling landed, hardware build pending.
 
 Update this checklist as work lands.
