@@ -33,8 +33,11 @@ CHANNEL="${2:-58}"
 [[ "$CHANNEL" =~ ^[0-9]+$ ]] || { echo "channel must be a number (got '$CHANNEL')" >&2; exit 2; }
 OPTA_IP="192.168.1.$((200 + KIT))"
 PI_IP="192.168.1.$((100 + KIT))"
+# The other two demo kits shown on the dashboard (default: the next two kit numbers).
+DEMO_KITS="${DEMO_KITS:-$((KIT + 1)),$((KIT + 2))}"
 
 echo "== demo central: Kit $KIT (Pi $PI_IP, own Opta $OPTA_IP) on channel $CHANNEL =="
+echo "   dashboard scoped to: central Kit $KIT + kits $DEMO_KITS (demo.html)"
 
 echo "-- stop/disable the mesh listener (the collector owns the HAT) --"
 if systemctl list-unit-files smartmeter-listener.service 2>/dev/null | grep -q smartmeter-listener; then
@@ -65,7 +68,7 @@ User=$RUN_USER
 WorkingDirectory=$REPO
 # Unbuffered so RX-beacon/TX lines hit journalctl live (Python block-buffers under systemd).
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/usr/bin/python3 $REPO/central/collector.py --host $OPTA_IP --port 8090
+ExecStart=/usr/bin/python3 $REPO/central/collector.py --host $OPTA_IP --port 8090 --dashboard demo.html --kits $DEMO_KITS
 Restart=on-failure
 RestartSec=5
 

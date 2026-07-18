@@ -43,6 +43,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 _lock = threading.Lock()
 _fleet = {}                       # kit_id -> {"fw":int, "rssi":int|None, "last":monotonic}
 _central_meter = {"present": False}
+_kits = None                      # kit ids to expose in the snapshot (None -> all 1..N_KITS)
 _args = None
 _lora = None                      # the HAT, shared by the RX loop and the /api/send TX
 _lora_lock = threading.Lock()     # serialize HAT access (RX read vs. facilitator TX)
@@ -200,8 +201,12 @@ def node_json(kid, now):
 
 def snapshot():
     now = time.monotonic()
+    kits = _kits if _kits is not None else range(1, N_KITS + 1)
+    # node 0 is always the central's own local meter; `central_id` is its real kit number
+    # (e.g. 43 on the demo), so a dashboard can label the central tile correctly.
     return {"ts": time.time(), "stale_sec": STALE_SEC,
-            "nodes": [node_json(k, now) for k in range(0, N_KITS + 1)]}
+            "central_id": fieldnode.derive_kit_id(_args.host),
+            "nodes": [node_json(0, now)] + [node_json(k, now) for k in kits]}
 
 
 # ---------------------------------------------------------------- HTTP
@@ -221,12 +226,19 @@ class Handler(BaseHTTPRequestHandler):
         if self.path.startswith("/api/fleet"):
             self._send(200, "application/json", json.dumps(snapshot()).encode())
             return
-        if self.path in ("/", "/index.html", "/fleet.html"):
+        # "/" serves the configured dashboard (fleet.html by default; demo.html for the demo);
+        # the two files are also reachable by their own names.
+        fname = None
+        if self.path in ("/", "/index.html"):
+            fname = _args.dashboard
+        elif self.path in ("/fleet.html", "/demo.html"):
+            fname = self.path.lstrip("/")
+        if fname:
             try:
-                with open(os.path.join(HERE, "fleet.html"), "rb") as f:
+                with open(os.path.join(HERE, fname), "rb") as f:
                     self._send(200, "text/html; charset=utf-8", f.read())
             except OSError:
-                self._send(500, "text/plain", b"fleet.html not found")
+                self._send(500, "text/plain", ("%s not found" % fname).encode())
             return
         self._send(404, "text/plain", b"not found")
 
@@ -258,7 +270,15 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--host", default="192.168.1.200", help="this central node's own Opta (Kit 00) Modbus IP")
     ap.add_argument("--port", type=int, default=8090, help="dashboard/JSON port")
+    ap.add_argument("--dashboard", default="fleet.html",
+                    help="dashboard HTML served at / (default fleet.html; the DV demo uses demo.html)")
+    ap.add_argument("--kits", default="",
+                    help="comma list of kit ids to show (default: all 1..%d). DV demo: '44,45'" % N_KITS)
     _args = ap.parse_args()
+
+    global _kits
+    if _args.kits.strip():
+        _kits = [int(x) for x in _args.kits.split(",") if x.strip()]
 
     global _lora
     from lora import LoRaHAT

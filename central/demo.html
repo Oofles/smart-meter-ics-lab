@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart-Meter Attack — Live Demo</title>
+<style>
+  :root {
+    --bg:#e9eef1; --panel:#ffffff; --panel-2:#f3f7f8; --tile:#ffffff;
+    --line:#d3dce0; --line-soft:#e2e9ec;
+    --text:#122029; --muted:#5a6b76; --faint:#8a99a2;
+    --accent:#0c9789; --accent-ink:#0a7c70;
+    --ok:#1f9d52; --warn:#ad7a12; --crit:#d63a26; --unknown:#7d8c96;
+    --ok-bg:#e3f4e9; --warn-bg:#f6edd6; --crit-bg:#fae0dc; --unknown-bg:#e7edf0;
+    --shadow:0 1px 2px rgba(18,32,41,.06), 0 6px 20px rgba(18,32,41,.06);
+    --radius:12px;
+    --mono:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0a0f14; --panel:#111a21; --panel-2:#0e161c; --tile:#0f181f;
+      --line:#22313a; --line-soft:#1a262e; --text:#d9e6ea; --muted:#8395a0; --faint:#5d6e78;
+      --accent:#37d1c1; --accent-ink:#4fdccd; --ok:#46cb6e; --warn:#e6b23c; --crit:#ff6149; --unknown:#647680;
+      --ok-bg:#12281b; --warn-bg:#2a2313; --crit-bg:#2e1713; --unknown-bg:#18232b;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 26px rgba(0,0,0,.34);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg:#e9eef1; --panel:#ffffff; --panel-2:#f3f7f8; --tile:#ffffff; --line:#d3dce0; --line-soft:#e2e9ec;
+    --text:#122029; --muted:#5a6b76; --faint:#8a99a2; --accent:#0c9789; --accent-ink:#0a7c70;
+    --ok:#1f9d52; --warn:#ad7a12; --crit:#d63a26; --unknown:#7d8c96;
+    --ok-bg:#e3f4e9; --warn-bg:#f6edd6; --crit-bg:#fae0dc; --unknown-bg:#e7edf0;
+    --shadow:0 1px 2px rgba(18,32,41,.06), 0 6px 20px rgba(18,32,41,.06);
+  }
+  :root[data-theme="dark"] {
+    --bg:#0a0f14; --panel:#111a21; --panel-2:#0e161c; --tile:#0f181f; --line:#22313a; --line-soft:#1a262e;
+    --text:#d9e6ea; --muted:#8395a0; --faint:#5d6e78; --accent:#37d1c1; --accent-ink:#4fdccd;
+    --ok:#46cb6e; --warn:#e6b23c; --crit:#ff6149; --unknown:#647680;
+    --ok-bg:#12281b; --warn-bg:#2a2313; --crit-bg:#2e1713; --unknown-bg:#18232b;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 26px rgba(0,0,0,.34);
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:var(--sans); line-height:1.5; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1200px; margin:0 auto; padding:18px clamp(14px,3vw,30px) 34px; }
+  .bar { display:flex; align-items:center; gap:16px 20px; flex-wrap:wrap; padding:14px 18px; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
+  .brand { display:flex; align-items:center; gap:12px; margin-right:auto; }
+  .dish { width:34px; height:34px; flex:none; border-radius:9px; background:linear-gradient(150deg,var(--accent),color-mix(in srgb,var(--accent) 55%, #000 12%)); display:grid; place-items:center; color:#03110f; font-size:18px; }
+  .brand h1 { margin:0; font-size:15px; letter-spacing:.2px; font-weight:650; }
+  .brand .sub { margin:0; font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .clock { font-family:var(--mono); font-size:13px; letter-spacing:.04em; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .chip { display:flex; align-items:center; gap:9px; padding:8px 12px; background:var(--panel-2); border:1px solid var(--line-soft); border-radius:10px; font-size:12.5px; white-space:nowrap; }
+  .chip .lab { font-family:var(--mono); font-size:10px; letter-spacing:.09em; text-transform:uppercase; color:var(--faint); }
+  .chip .val { font-weight:600; }
+  .led { width:9px; height:9px; border-radius:50%; flex:none; background:var(--unknown); box-shadow:0 0 0 3px color-mix(in srgb,var(--unknown) 22%, transparent); }
+  .led.on { background:var(--ok); box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 22%, transparent); }
+  .led.bad { background:var(--crit); box-shadow:0 0 0 3px color-mix(in srgb,var(--crit) 22%, transparent); }
+  .led.live { animation:pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity:.35; } }
+  .themeBtn { font-family:var(--mono); font-size:11px; letter-spacing:.06em; padding:8px 11px; background:var(--panel-2); color:var(--text); border:1px solid var(--line); border-radius:9px; cursor:pointer; }
+  .themeBtn:hover { border-color:var(--accent); } .themeBtn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); margin-top:14px; }
+  .card > h2 { margin:0; padding:13px 16px; font-size:12px; font-family:var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--line-soft); display:flex; align-items:center; gap:10px; }
+  .card > h2 .rt { margin-left:auto; text-transform:none; letter-spacing:0; color:var(--faint); }
+
+  /* RF console */
+  .rfc { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:14px 16px; }
+  .rbtn { font-family:var(--sans); font-size:13.5px; font-weight:600; padding:10px 15px; border-radius:9px; border:1px solid var(--line); background:var(--panel-2); color:var(--text); cursor:pointer; display:inline-flex; align-items:center; gap:7px; transition:border-color .15s, transform .08s; }
+  .rbtn:hover { transform:translateY(-1px); } .rbtn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .rbtn.warn { color:var(--warn); border-color:color-mix(in srgb,var(--warn) 42%,var(--line)); background:var(--warn-bg); }
+  .rbtn.crit { color:var(--crit); border-color:color-mix(in srgb,var(--crit) 42%,var(--line)); background:var(--crit-bg); }
+  .rbtn.ok   { color:var(--ok);   border-color:color-mix(in srgb,var(--ok) 42%,var(--line));   background:var(--ok-bg); }
+  .rbtn:disabled { opacity:.5; cursor:default; transform:none; }
+  .hops { font-family:var(--mono); font-size:11px; color:var(--muted); display:inline-flex; align-items:center; gap:6px; margin-left:4px; }
+  .hops select { font-family:var(--mono); font-size:12px; padding:5px 6px; border-radius:7px; border:1px solid var(--line); background:var(--panel-2); color:var(--text); }
+  .rfmsg { font-family:var(--mono); font-size:11.5px; color:var(--muted); margin-left:auto; font-variant-numeric:tabular-nums; }
+
+  /* the 3-kit row */
+  .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:16px; }
+  @media (max-width:900px){ .cards { grid-template-columns:1fr; } }
+  .kcard { position:relative; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; display:flex; flex-direction:column; }
+  .kcard::before { content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--unknown); }
+  .kcard.s-normal::before{ background:var(--ok); }
+  .kcard.s-test::before  { background:var(--warn); }
+  .kcard.s-locked::before{ background:var(--crit); }
+  .kcard.s-unknown::before{ background:var(--unknown); }
+  .kcard.s-test  { background:color-mix(in srgb,var(--warn-bg) 40%, var(--panel)); }
+  .kcard.s-locked{ background:color-mix(in srgb,var(--crit-bg) 46%, var(--panel)); border-color:color-mix(in srgb,var(--crit) 40%,var(--line)); }
+  .khead { display:flex; align-items:baseline; gap:8px; padding:15px 18px 4px 20px; }
+  .khead .kn { font-family:var(--mono); font-weight:700; font-size:24px; letter-spacing:.02em; }
+  .khead .role { font-family:var(--mono); font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); }
+  .khead .tag { margin-left:auto; font-family:var(--mono); font-size:8.5px; letter-spacing:.11em; color:#04110f; background:var(--accent); padding:3px 8px; border-radius:6px; }
+  .banner { margin:8px 20px 0; padding:11px 14px; border-radius:10px; font-weight:700; font-size:15px; letter-spacing:.01em; display:flex; align-items:center; gap:10px; border:1px solid transparent; }
+  .banner .bdot { width:11px; height:11px; border-radius:50%; flex:none; }
+  .banner.s-normal { color:var(--ok);  background:var(--ok-bg);  border-color:color-mix(in srgb,var(--ok) 30%,transparent); }
+  .banner.s-test   { color:var(--warn);background:var(--warn-bg);border-color:color-mix(in srgb,var(--warn) 32%,transparent); }
+  .banner.s-locked { color:var(--crit);background:var(--crit-bg);border-color:color-mix(in srgb,var(--crit) 36%,transparent); }
+  .banner.s-unknown{ color:var(--unknown);background:var(--unknown-bg);border-color:color-mix(in srgb,var(--unknown) 30%,transparent); }
+  .banner.s-normal .bdot{background:var(--ok);} .banner.s-test .bdot{background:var(--warn);}
+  .banner.s-locked .bdot{background:var(--crit);} .banner.s-unknown .bdot{background:var(--unknown);}
+  .banner.s-locked, .banner.s-test { animation:softpulse 2.2s ease-in-out infinite; }
+  @keyframes softpulse { 50% { opacity:.72; } }
+  .panel { display:flex; gap:12px; padding:16px 20px; }
+  .lamp { display:flex; flex-direction:column; align-items:center; gap:7px; flex:1; }
+  .lamp .bulb { width:38px; height:38px; border-radius:50%; border:1px solid var(--line); background:var(--tile); transition:background .2s, box-shadow .2s; }
+  .lamp .cap { font-family:var(--mono); font-size:9.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--faint); }
+  .bulb.on.blue  { background:#3b82f6; border-color:#3b82f6; box-shadow:0 0 14px #3b82f6aa; }
+  .bulb.on.green { background:var(--ok); border-color:var(--ok); box-shadow:0 0 14px color-mix(in srgb,var(--ok) 65%,transparent); }
+  .bulb.on.yellow{ background:var(--warn); border-color:var(--warn); box-shadow:0 0 14px color-mix(in srgb,var(--warn) 65%,transparent); }
+  .bulb.on.red   { background:var(--crit); border-color:var(--crit); box-shadow:0 0 16px color-mix(in srgb,var(--crit) 70%,transparent); }
+  .kv { display:grid; grid-template-columns:auto 1fr; gap:8px 14px; font-size:13.5px; padding:4px 20px 8px; }
+  .kv dt { color:var(--muted); } .kv dd { margin:0; text-align:right; font-family:var(--mono); font-variant-numeric:tabular-nums; } .kv dd.big { font-weight:680; font-size:15px; }
+  .fwtag { font-family:var(--mono); font-size:11px; font-weight:600; padding:2px 7px; border-radius:5px; }
+  .fw0{ color:var(--ok); background:var(--ok-bg);} .fw1{ color:var(--warn); background:var(--warn-bg);} .fw2{ color:var(--crit); background:var(--crit-bg);}
+  .kfoot { margin-top:auto; display:flex; align-items:center; gap:10px; padding:11px 20px; border-top:1px solid var(--line-soft); font-family:var(--mono); font-size:11px; color:var(--muted); }
+  .bars { display:flex; align-items:flex-end; gap:2px; height:14px; }
+  .bars i { width:4px; border-radius:1px; background:var(--line); }
+  .bars i:nth-child(1){height:35%;} .bars i:nth-child(2){height:55%;} .bars i:nth-child(3){height:78%;} .bars i:nth-child(4){height:100%;}
+  .bars i.lit { background:var(--accent); }
+  .kfoot .ip { margin-left:auto; color:var(--faint); }
+
+  footer { margin-top:16px; display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center; padding:13px 16px; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
+  .leg { display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--muted); }
+  .leg .sw { width:12px; height:12px; border-radius:3px; }
+  footer .fine { margin-left:auto; font-size:11.5px; color:var(--faint); font-family:var(--mono); }
+  @media (prefers-reduced-motion: reduce){ *{ animation:none !important; transition:none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="bar">
+    <div class="brand">
+      <div class="dish" aria-hidden="true">📡</div>
+      <div><h1>Smart-Meter Attack — Live Demo</h1><p class="sub">Demo mesh · isolated · LoRa 908.125&nbsp;MHz · ch&nbsp;58</p></div>
+    </div>
+    <div class="chip"><span class="lab">Collector</span><span class="led" id="collLed"></span><span class="val" id="collVal">connecting…</span></div>
+    <span class="clock" id="clock">--:--:--</span>
+    <button class="themeBtn" id="themeBtn" title="Toggle light / dark">◐ THEME</button>
+  </header>
+
+  <section class="card">
+    <h2>RF Console <span class="rt" id="consoleRt">transmits over LoRa on the demo mesh — hits the three demo kits only</span></h2>
+    <div class="rfc">
+      <button class="rbtn warn" data-type="malicious">⚡ Deliver payload · TEST</button>
+      <button class="rbtn crit" data-type="malicious_lock">🔒 Deliver payload · LOCK</button>
+      <button class="rbtn ok" data-type="reset">↺ Reset all</button>
+      <label class="hops">hops
+        <select id="ttl"><option value="1">1 · direct</option><option value="2">2</option><option value="3">3 · mesh</option></select>
+      </label>
+      <span class="rfmsg" id="rfmsg">idle</span>
+    </div>
+  </section>
+
+  <section class="cards" id="cards" aria-label="Demo kits"></section>
+
+  <footer>
+    <span class="leg"><span class="sw" style="background:var(--ok)"></span>Normal (energized)</span>
+    <span class="leg"><span class="sw" style="background:var(--warn)"></span>Test trip · FW_MODE&nbsp;1 (RESET clears)</span>
+    <span class="leg"><span class="sw" style="background:var(--crit)"></span>Exercise lock · FW_MODE&nbsp;2 (RESET disabled)</span>
+    <span class="leg"><span class="sw" style="background:var(--unknown)"></span>Unknown / stale</span>
+    <span class="fine" id="fine">live · isolated demo mesh · payloads never reach the exercise fleet</span>
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const $ = s => document.querySelector(s);
+  const root = document.documentElement;
+  $("#themeBtn").addEventListener("click", () => {
+    const cur = root.getAttribute("data-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    root.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
+  });
+  const clk = $("#clock");
+  setInterval(()=>{ const d=new Date(); clk.textContent=[d.getHours(),d.getMinutes(),d.getSeconds()].map(n=>String(n).padStart(2,"0")).join(":"); },1000);
+
+  // ---- RF console: real LoRa transmit on the demo mesh ----
+  const rfmsg = $("#rfmsg");
+  const TXLAB = { malicious:"TEST payload", malicious_lock:"EXERCISE LOCK", reset:"reset" };
+  const rbtns = () => document.querySelectorAll(".rbtn");
+  rbtns().forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const type=btn.dataset.type, ttl=+$("#ttl").value, lab=TXLAB[type];
+      const verb = type==="reset" ? "recover" : "fault (go red)";
+      if(!confirm(`Deliver ${lab} over LoRa to the demo kits (ttl ${ttl})?\n\nReal RF transmission on the ISOLATED demo mesh (ch 58) — the exercise fleet on ch 65 cannot hear it. Every demo kit that receives it will ${verb}.`)) return;
+      rbtns().forEach(b=>b.disabled=true);
+      rfmsg.textContent = "sending "+lab+"…";
+      try{
+        const r=await fetch("/api/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type,ttl})});
+        const d=await r.json();
+        rfmsg.textContent = d.ok
+          ? `sent ${lab} · id 0x${d.msg_id.toString(16).padStart(4,"0").toUpperCase()} · ttl ${d.ttl}`
+          : ("error: "+(d.error||"failed"));
+      }catch(e){ rfmsg.textContent="error: network"; }
+      finally{ rbtns().forEach(b=>b.disabled=false); }
+    });
+  });
+
+  const STATE = { normal:"Normal · Energized", test:"Tripped · TEST", locked:"Locked · EXERCISE", unknown:"Unknown" };
+  const seenTxt = s => s===null||s===undefined ? "—" : (s<60 ? s+"s ago" : Math.floor(s/60)+"m ago");
+  const rssiBars = d => d===null||d===undefined ? 0 : d>=-60?4 : d>=-75?3 : d>=-90?2 : d>=-104?1 : 0;
+  function lamp(on,color,cap){ return `<div class="lamp"><span class="bulb ${on?'on':''} ${color}"></span><span class="cap">${cap}</span></div>`; }
+
+  function meterPanel(n){
+    const m = n.meter;
+    if (m){                                   // central: full meter polled over Modbus
+      return `<div class="panel">${lamp(m.lamps.blue,"blue","O1")}${lamp(m.lamps.green,"green","O2")}${lamp(m.lamps.yellow,"yellow","O3")}${lamp(m.lamps.red,"red","O4")}</div>
+        <dl class="kv">
+          <dt>Power</dt><dd class="big">${m.power?"Energized":"Faulted"}</dd>
+          <dt>Voltage</dt><dd class="big">${m.voltage} V</dd>
+          <dt>Usage</dt><dd class="big">${m.watts} W</dd>
+          <dt>FW_MODE</dt><dd><span class="fwtag fw${n.fw}">${n.fw} · ${(STATE[n.state]||"").split(" · ")[0].toLowerCase()}</span></dd>
+        </dl>`;
+    }
+    if (n.state==="unknown"){
+      return `<div class="panel">${lamp(0,"blue","O1")}${lamp(0,"green","O2")}${lamp(0,"yellow","O3")}${lamp(0,"red","O4")}</div>
+        <dl class="kv"><dt>Status</dt><dd style="color:var(--muted)">no beacon yet</dd></dl>`;
+    }
+    // field kit: beacon carries FW_MODE only — derive the panel (full meter is local to the kit)
+    const faulted = n.state!=="normal";
+    return `<div class="panel">${lamp(!faulted,"blue","O1")}${lamp(!faulted,"green","O2")}${lamp(false,"yellow","O3")}${lamp(faulted,"red","O4")}</div>
+      <dl class="kv">
+        <dt>Power</dt><dd class="big">${faulted?"Faulted":"Energized"}</dd>
+        <dt>FW_MODE</dt><dd><span class="fwtag fw${n.fw}">${n.fw} · ${(STATE[n.state]||"").split(" · ")[0].toLowerCase()}</span></dd>
+        <dt>Telemetry</dt><dd style="color:var(--muted)">beacon (state)</dd>
+      </dl>`;
+  }
+
+  function cardHtml(n, centralId){
+    const kid = n.central ? centralId : n.id;
+    const role = n.central ? "Central · Injector" : "Meter";
+    const tag = n.central ? `<span class="tag">CONSOLE</span>` : "";
+    const st = n.state || "unknown";
+    const foot = n.central
+      ? `<span>USB / local Modbus</span><span class="ip">Pi .${100+kid} · Opta .${200+kid}</span>`
+      : (st==="unknown"
+          ? `<span>no signal · ${seenTxt(n.last)}</span><span class="ip">Pi .${100+kid} · Opta .${200+kid}</span>`
+          : `<span class="bars">${[0,1,2,3].map(b=>`<i class="${b<rssiBars(n.rssi)?'lit':''}"></i>`).join("")}</span>
+             <span>${n.rssi===null||n.rssi===undefined?"—":n.rssi+" dBm"} · ${seenTxt(n.last)}</span>
+             <span class="ip">Pi .${100+kid} · Opta .${200+kid}</span>`);
+    return `<article class="kcard s-${st}">
+        <div class="khead"><span class="kn">K${String(kid).padStart(2,"0")}</span><span class="role">${role}</span>${tag}</div>
+        <div class="banner s-${st}"><span class="bdot"></span>${STATE[st]||"Unknown"}</div>
+        ${meterPanel(n)}
+        <div class="kfoot">${foot}</div>
+      </article>`;
+  }
+
+  const cardsEl = $("#cards");
+  function render(data){
+    const nodes = data.nodes || [];
+    const central = nodes.find(n=>n.central);
+    const fields = nodes.filter(n=>!n.central).sort((a,b)=>a.id-b.id);
+    const ordered = (central?[central]:[]).concat(fields);
+    cardsEl.innerHTML = ordered.map(n=>cardHtml(n, data.central_id ?? 0)).join("");
+  }
+
+  // ---- poll the collector ----
+  const collLed=$("#collLed"), collVal=$("#collVal");
+  function setOnline(ok){ collLed.className="led "+(ok?"on live":"bad"); collVal.textContent = ok?"Listening":"Collector offline"; }
+  async function poll(){
+    try{
+      const r = await fetch("/api/fleet",{cache:"no-store"});
+      if(!r.ok) throw 0;
+      const data = await r.json();
+      render(data);
+      setOnline(true);
+    }catch(e){ setOnline(false); }
+  }
+  setInterval(poll, 1500); poll();
+})();
+</script>
+</body>
+</html>
