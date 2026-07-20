@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Smart-Meter ICS Attack Lab - Exercise Briefing</title>
+<style>
+  :root {
+    --bg: #e9edf2; --bg-2: #ffffff; --bg-3: #f4f7fa;
+    --ink: #16212d; --ink-dim: #526376; --line: #cfd9e2; --line-2: #dde5ec;
+    --accent: #b0761a; --blue: #2f7fce; --green: #1f9d57; --amber: #c0871a; --red: #d43b2c;
+    --shadow: 0 12px 34px rgba(20,32,45,.10);
+    --mono: "SF Mono","JetBrains Mono","Cascadia Code",ui-monospace,Menlo,Consolas,monospace;
+    --sans: ui-sans-serif,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0c131c; --bg-2: #121c28; --bg-3: #182432;
+      --ink: #e9eff6; --ink-dim: #9bacbf; --line: #263443; --line-2: #1f2c3a;
+      --accent: #f2b32e; --blue: #4a9be8; --green: #38ca74; --amber: #f2b32e; --red: #ef5340;
+      --shadow: 0 20px 48px rgba(0,0,0,.46);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0c131c; --bg-2: #121c28; --bg-3: #182432;
+    --ink: #e9eff6; --ink-dim: #9bacbf; --line: #263443; --line-2: #1f2c3a;
+    --accent: #f2b32e; --blue: #4a9be8; --green: #38ca74; --amber: #f2b32e; --red: #ef5340;
+    --shadow: 0 20px 48px rgba(0,0,0,.46);
+  }
+  :root[data-theme="light"] {
+    --bg: #e9edf2; --bg-2: #ffffff; --bg-3: #f4f7fa;
+    --ink: #16212d; --ink-dim: #526376; --line: #cfd9e2; --line-2: #dde5ec;
+    --accent: #b0761a; --blue: #2f7fce; --green: #1f9d57; --amber: #c0871a; --red: #d43b2c;
+    --shadow: 0 12px 34px rgba(20,32,45,.10);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--sans); -webkit-font-smoothing: antialiased; overflow: hidden; }
+
+  .deck { position: fixed; inset: 0; display: flex; flex-direction: column; }
+
+  .rail { height: 4px; background: var(--line-2); flex: 0 0 auto; position: relative; z-index: 5; }
+  .rail > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg,var(--accent),var(--amber));
+    transition: width .4s cubic-bezier(.4,0,.2,1); }
+
+  header.bar {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 20px;
+    padding: 13px 34px; border-bottom: 1px solid var(--line);
+    background: color-mix(in srgb, var(--bg-2) 86%, transparent); backdrop-filter: blur(6px);
+    position: relative; z-index: 4;
+  }
+  .brand { font-family: var(--mono); font-size: 13px; letter-spacing: .15em; text-transform: uppercase;
+    color: var(--ink-dim); white-space: nowrap; }
+  .brand b { color: var(--ink); font-weight: 700; }
+
+  .panel { display: flex; align-items: center; gap: 10px; }
+  .lamp { width: 16px; height: 16px; border-radius: 50%; background: var(--seat, #2a3644);
+    border: 1px solid rgba(0,0,0,.35); box-shadow: inset 0 1px 2px rgba(0,0,0,.5);
+    transition: background .45s ease, box-shadow .45s ease; }
+  :root[data-theme="light"] .lamp { --seat: #c4cdd6; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme]) .lamp { --seat: #c4cdd6; } }
+  .lamp.on.b { background: var(--blue);  box-shadow: 0 0 12px 1px color-mix(in srgb,var(--blue) 70%,transparent); }
+  .lamp.on.g { background: var(--green); box-shadow: 0 0 12px 1px color-mix(in srgb,var(--green) 70%,transparent); }
+  .lamp.on.y { background: var(--amber); box-shadow: 0 0 12px 1px color-mix(in srgb,var(--amber) 70%,transparent); }
+  .lamp.on.r { background: var(--red);   box-shadow: 0 0 15px 2px color-mix(in srgb,var(--red) 80%,transparent); }
+  .panel-tag { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; color: var(--ink-dim); text-transform: uppercase; }
+  .bar .spacer { flex: 1 1 auto; }
+  .count { font-family: var(--mono); font-size: 13px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+  .count b { color: var(--ink); }
+  .tbtn { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); cursor: pointer;
+    background: var(--bg-3); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+  .tbtn:hover { color: var(--ink); border-color: var(--accent); }
+  .tbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .stage { flex: 1 1 auto; position: relative; overflow: hidden; }
+  .slide { position: absolute; inset: 0; padding: clamp(24px, 4.6vh, 56px) clamp(34px, 7vw, 120px);
+    display: flex; flex-direction: column; justify-content: center; gap: clamp(15px,2.4vh,26px);
+    opacity: 0; visibility: hidden; transform: translateY(16px);
+    transition: opacity .45s ease, transform .45s ease, visibility .45s; overflow-y: auto; }
+  .slide.active { opacity: 1; visibility: visible; transform: none; }
+  .slide.leaving { transform: translateY(-16px); }
+  @media (prefers-reduced-motion: reduce) { .slide { transition: opacity .2s ease; transform: none !important; } }
+
+  .eyebrow { font-family: var(--mono); font-size: clamp(12px,1.55vh,15px); letter-spacing: .22em;
+    text-transform: uppercase; color: var(--accent); display: flex; align-items: center; gap: 14px; }
+  .eyebrow::before { content: ""; width: 34px; height: 2px; background: var(--accent); display: inline-block; }
+  h1 { font-size: clamp(32px, 6vh, 66px); line-height: 1.02; letter-spacing: -.025em; margin: 0;
+    text-wrap: balance; font-weight: 800; }
+  h2 { font-size: clamp(28px, 5.2vh, 52px); line-height: 1.05; letter-spacing: -.02em; margin: 0;
+    text-wrap: balance; font-weight: 800; }
+  .lede { font-size: clamp(16px, 2.4vh, 24px); line-height: 1.5; color: var(--ink-dim); max-width: 68ch; margin: 0; }
+  .lede.wide { max-width: 84ch; }
+  p { margin: 0; }
+  strong.hl { color: var(--ink); font-weight: 700; }
+  .k-blue { color: var(--blue); font-weight:700; } .k-green { color: var(--green); font-weight:700; }
+  .k-amber { color: var(--amber); font-weight:700; } .k-red { color: var(--red); font-weight: 700; }
+
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(20px,3vw,44px); align-items: start; }
+  .cols.lean { grid-template-columns: 1.05fr .95fr; }
+  .cols-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; }
+  @media (max-width: 940px) { .cols, .cols.lean, .cols-3 { grid-template-columns: 1fr; } }
+
+  .card { background: var(--bg-2); border: 1px solid var(--line); border-radius: 14px;
+    padding: clamp(17px,2.2vh,24px) clamp(19px,1.7vw,26px); box-shadow: var(--shadow); }
+  .card h3 { margin: 0 0 10px; font-size: clamp(16px,2.2vh,21px); letter-spacing: -.01em; }
+  .card p, .card li { font-size: clamp(14px,1.9vh,18px); line-height: 1.5; color: var(--ink-dim); }
+  .card.accent { border-left: 4px solid var(--accent); }
+  .card.red { border-left: 4px solid var(--red); }
+  .card.green { border-left: 4px solid var(--green); }
+  .card.blue { border-left: 4px solid var(--blue); }
+
+  ul.clean { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
+  ul.clean li { display: flex; gap: 13px; align-items: baseline; font-size: clamp(15px,2.1vh,19px);
+    line-height: 1.45; color: var(--ink); }
+  ul.clean li::before { content: ""; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 2px;
+    background: var(--accent); transform: translateY(-1px); }
+  ul.clean.blue li::before { background: var(--blue); }
+  ul.clean.red  li::before { background: var(--red); }
+  ul.clean li b { color: var(--ink); }
+
+  /* aligned definition table (slide 3) */
+  .deflist { display: grid; grid-template-columns: max-content 1fr;
+    column-gap: clamp(20px,3vw,52px); }
+  .deflist dt, .deflist dd { padding: clamp(12px,1.9vh,18px) 0; border-top: 1px solid var(--line);
+    font-size: clamp(15px,2.15vh,20px); line-height: 1.45; }
+  .deflist dt { font-weight: 700; color: var(--ink); white-space: nowrap; }
+  .deflist dd { margin: 0; color: var(--ink-dim); }
+  .deflist .first dt, .deflist .first dd { border-top: none; }
+
+  code, pre, .mono { font-family: var(--mono); }
+  code.reg { background: var(--bg-3); border: 1px solid var(--line); border-radius: 5px; padding: 1px 7px;
+    font-size: .82em; color: var(--ink); white-space: nowrap; }
+
+  .term { background: #0a1018; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+  :root[data-theme="light"] .term { background: #0d1621; }
+  .term .top { display: flex; align-items: center; gap: 7px; padding: 10px 15px; border-bottom: 1px solid #1e2c3b; background: #0f1824; }
+  .term .top i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  .term .top i:nth-child(1){background:#e5533d;} .term .top i:nth-child(2){background:#e0a72e;} .term .top i:nth-child(3){background:#33b95a;}
+  .term .top span { margin-left: 9px; font-family: var(--mono); font-size: 12px; color: #6d8296; letter-spacing: .08em; }
+  .term pre { margin: 0; padding: 18px 20px; overflow-x: auto; font-size: clamp(13px,1.95vh,17px); line-height: 1.75; color: #cdd9e6; }
+  .term .p { color: #4f9d5f; } .term .c { color: #5a6f83; } .term .o { color: #e0a72e; } .term .a { color: #6db6ec; } .term .r { color: #ef6a58; }
+
+  .twrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 13px; box-shadow: var(--shadow); background: var(--bg-2); }
+  table { border-collapse: collapse; width: 100%; font-size: clamp(14px,2vh,18px); }
+  th, td { text-align: left; padding: 12px 18px; border-bottom: 1px solid var(--line-2); }
+  thead th { font-family: var(--mono); font-size: 12px; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--ink-dim); background: var(--bg-3); position: sticky; top: 0; }
+  tbody tr:last-child td { border-bottom: none; }
+  td .nm, td.nm { font-family: var(--mono); color: var(--ink); }
+  td.addr { font-family: var(--mono); color: var(--accent); white-space: nowrap; }
+
+  /* component walkthrough */
+  .spec { display: flex; flex-direction: column; gap: 16px; }
+  .specrow { display: flex; align-items: baseline; gap: 18px; }
+  .specrow .idx { font-family: var(--mono); font-size: clamp(40px,8vh,86px); font-weight: 800; line-height: .8;
+    color: var(--accent); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .specrow .idx small { font-size: .4em; color: var(--ink-dim); font-weight: 600; }
+  .kv2 { display: grid; grid-template-columns: auto 1fr; gap: 9px 18px; font-size: clamp(14px,2vh,18px); }
+  .kv2 dt { font-family: var(--mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--ink-dim); white-space: nowrap; padding-top: 3px; }
+  .kv2 dd { margin: 0; color: var(--ink); }
+
+  /* flow diagram */
+  .flow { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; }
+  .node { flex: 1 1 0; min-width: 160px; background: var(--bg-2); border: 1px solid var(--line);
+    border-radius: 13px; padding: 18px 18px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 7px; }
+  .node .t { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+  .node .n { font-weight: 700; font-size: clamp(15px,2.2vh,20px); }
+  .node .d { font-size: clamp(12.5px,1.7vh,15px); color: var(--ink-dim); line-height: 1.42; }
+  .node.attack { border-color: color-mix(in srgb,var(--red) 45%,var(--line)); }
+  .node.attack .t { color: var(--red); }
+  .arrow { flex: 0 0 auto; align-self: center; display: flex; flex-direction: column; align-items: center; color: var(--ink-dim); padding: 0 12px; }
+  .arrow .lab { font-family: var(--mono); font-size: 11px; letter-spacing: .05em; margin-bottom: 3px; color: var(--accent); white-space: nowrap; }
+  .arrow .g { font-size: 26px; line-height: 1; color: var(--accent); }
+  @media (max-width: 940px) { .flow { flex-direction: column; } .arrow { transform: rotate(90deg); padding: 8px 0; } }
+
+  .note { font-family: var(--mono); font-size: clamp(12px,1.6vh,14.5px); color: var(--ink-dim);
+    border-left: 3px solid var(--line); padding-left: 14px; line-height: 1.55; }
+  .note b { color: var(--accent); }
+
+  .hero-panel { display: flex; gap: 22px; align-items: center; margin-top: 6px; }
+  .hero-lamp { width: 40px; height: 40px; border-radius: 50%; background: var(--seat,#2a3644);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,.55); border: 1px solid rgba(0,0,0,.4); }
+  :root[data-theme="light"] .hero-lamp { --seat: #c4cdd6; }
+  .hero-lamp.b{background:var(--blue);box-shadow:0 0 26px 4px color-mix(in srgb,var(--blue) 65%,transparent);}
+  .hero-lamp.g{background:var(--green);box-shadow:0 0 26px 4px color-mix(in srgb,var(--green) 65%,transparent);}
+  .hero-lamp.y{background:var(--amber);box-shadow:0 0 26px 4px color-mix(in srgb,var(--amber) 65%,transparent);}
+  .hero-lamp.r{background:var(--red);box-shadow:0 0 30px 5px color-mix(in srgb,var(--red) 75%,transparent);animation:pulse 1.7s ease-in-out infinite;}
+  @keyframes pulse { 0%,100%{opacity:.72;} 50%{opacity:1;} }
+  @media (prefers-reduced-motion: reduce){ .hero-lamp.r{animation:none;} }
+
+  .tags { display: flex; flex-wrap: wrap; gap: 10px; }
+  .tag { font-family: var(--mono); font-size: 13px; letter-spacing: .03em; padding: 6px 13px; border-radius: 7px;
+    background: var(--bg-3); border: 1px solid var(--line); color: var(--ink-dim); }
+  .tag b { color: var(--accent); }
+
+  .big-quote { font-size: clamp(24px,4.4vh,46px); font-weight: 800; line-height: 1.12; letter-spacing: -.02em;
+    text-wrap: balance; max-width: 20ch; }
+  .big-quote .em { color: var(--red); }
+
+  /* dashboard snapshot */
+  .snapwrap { width: 100%; max-width: 1060px; margin: 0 auto; }
+  .snap { border: 1px solid var(--line); border-radius: 13px; overflow: hidden; box-shadow: var(--shadow); background: var(--bg-2); }
+  .snap .chrome { display: flex; align-items: center; gap: 7px; padding: 9px 14px; background: var(--bg-3); border-bottom: 1px solid var(--line); }
+  .snap .chrome i { width: 10px; height: 10px; border-radius: 50%; }
+  .snap .chrome i:nth-child(1){background:#e5533d;} .snap .chrome i:nth-child(2){background:#e0a72e;} .snap .chrome i:nth-child(3){background:#33b95a;}
+  .snap .chrome .url { margin-left: 11px; font-family: var(--mono); font-size: 11.5px; color: var(--ink-dim); }
+  .snap .body { padding: 15px 17px; display: flex; flex-direction: column; gap: 13px; }
+  .snap .head { display: flex; align-items: center; gap: 12px; }
+  .snap .dish { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; font-size: 16px;
+    background: linear-gradient(150deg,#16a99a,#0b6f66); }
+  .snap .htitle { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+  .snap .hsub { font-family: var(--mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-dim); }
+  .snap .listening { margin-left: auto; display: flex; align-items: center; gap: 8px; font-family: var(--mono);
+    font-size: 11.5px; color: var(--ink-dim); border: 1px solid var(--line); border-radius: 9px; padding: 6px 11px; }
+  .snap .listening i { width: 8px; height: 8px; border-radius: 50%; background: #2ba35d; box-shadow: 0 0 0 3px color-mix(in srgb,#2ba35d 22%,transparent); }
+  .snap .clock { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+  .snap .sum { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+  .snap .st { border: 1px solid var(--line); border-radius: 10px; padding: 10px 13px; background: var(--bg-3); }
+  .snap .st .k { font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); display: flex; align-items: center; gap: 6px; }
+  .snap .st .k .d { width: 8px; height: 8px; border-radius: 50%; }
+  .snap .st .n { font-size: clamp(20px,3vh,26px); font-weight: 750; margin-top: 3px; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .snap .glab { font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
+  .fsgrid { display: grid; grid-template-columns: repeat(auto-fill,minmax(102px,1fr)); gap: 8px; margin-top: 8px; }
+  .fskit { position: relative; border: 1px solid var(--line); border-radius: 9px; padding: 8px 9px 9px 12px; overflow: hidden; background: var(--bg-2); }
+  .fskit::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--stripe,#7d8c96); }
+  .fskit.central { border-color: color-mix(in srgb,#16a99a 50%,var(--line)); background: color-mix(in srgb,#16a99a 9%,var(--bg-2)); }
+  .fskit .r1 { display: flex; justify-content: space-between; align-items: baseline; gap: 5px; }
+  .fskit .kid { font-family: var(--mono); font-weight: 650; font-size: 13.5px; }
+  .fskit .seen { font-family: var(--mono); font-size: 9px; color: var(--ink-dim); }
+  .fspill { display: inline-block; margin-top: 7px; font-family: var(--mono); font-size: 8.5px; font-weight: 700;
+    letter-spacing: .07em; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; }
+  .fskit .r3 { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+  .fsbars { display: flex; align-items: flex-end; gap: 2px; height: 11px; }
+  .fsbars i { width: 3px; border-radius: 1px; background: var(--line); }
+  .fsbars i:nth-child(1){height:35%;} .fsbars i:nth-child(2){height:58%;} .fsbars i:nth-child(3){height:78%;} .fsbars i:nth-child(4){height:100%;}
+  .fsbars i.lit { background: #16a99a; }
+  .fsdbm { font-family: var(--mono); font-size: 9.5px; color: var(--ink-dim); }
+  .fs-ok { --stripe:#2ba35d; } .fs-ok .fspill { color:#1e8a4c; background: color-mix(in srgb,#2ba35d 17%,transparent); }
+  .fs-crit { --stripe:#e14b37; } .fs-crit .fspill { color:#d1412e; background: color-mix(in srgb,#e14b37 17%,transparent); }
+  .fs-central { --stripe:#16a99a; } .fs-central .fspill { color:#0f8f83; background: color-mix(in srgb,#16a99a 17%,transparent); }
+  .fs-unk { --stripe:#7d8c96; } .fs-unk .fspill { color:#6f7d87; background: color-mix(in srgb,#7d8c96 17%,transparent); }
+  @media (prefers-color-scheme: dark) {
+    .fs-ok .fspill { color:#46cb6e; } .fs-crit .fspill { color:#ff6f59; } .fs-central .fspill { color:#37d1c1; } .fs-unk .fspill { color:#93a4b0; }
+  }
+  :root[data-theme="dark"] .fs-ok .fspill { color:#46cb6e; }
+  :root[data-theme="dark"] .fs-crit .fspill { color:#ff6f59; }
+  :root[data-theme="dark"] .fs-central .fspill { color:#37d1c1; }
+  :root[data-theme="dark"] .fs-unk .fspill { color:#93a4b0; }
+  :root[data-theme="light"] .fs-ok .fspill { color:#1e8a4c; }
+  :root[data-theme="light"] .fs-crit .fspill { color:#d1412e; }
+  :root[data-theme="light"] .fs-central .fspill { color:#0f8f83; }
+  :root[data-theme="light"] .fs-unk .fspill { color:#6f7d87; }
+
+  footer.hint { flex: 0 0 auto; display: flex; align-items: center; gap: 18px; justify-content: center;
+    padding: 8px; border-top: 1px solid var(--line); background: var(--bg-2);
+    font-family: var(--mono); font-size: 12px; color: var(--ink-dim); letter-spacing: .04em; }
+  footer.hint kbd { background: var(--bg-3); border: 1px solid var(--line); border-bottom-width: 2px;
+    border-radius: 4px; padding: 1px 7px; color: var(--ink); }
+  footer.hint .dot { opacity: .4; }
+
+  .nav-zone { position: absolute; top: 0; bottom: 0; width: 13%; z-index: 3; cursor: pointer; }
+  .nav-zone.prev { left: 0; } .nav-zone.next { right: 0; }
+</style>
+</head>
+<body>
+<div class="deck">
+  <div class="rail"><i id="rail"></i></div>
+
+  <header class="bar">
+    <span class="brand"><b>SMART-METER</b> ICS LAB</span>
+    <div class="panel" id="hdrpanel" aria-hidden="true">
+      <span class="lamp b" data-l="b"></span><span class="lamp g" data-l="g"></span>
+      <span class="lamp y" data-l="y"></span><span class="lamp r" data-l="r"></span>
+    </div>
+    <span class="panel-tag" id="panelState">STATE: NORMAL</span>
+    <span class="spacer"></span>
+    <span class="count"><b id="cur">1</b> / <span id="tot">18</span></span>
+    <button class="tbtn" id="theme" title="Toggle light / dark">◐ theme</button>
+  </header>
+
+  <div class="stage" id="stage">
+
+    <!-- 1 · TITLE -->
+    <section class="slide" data-state="title">
+      <div class="eyebrow">Red-Team Exercise Briefing · OT / ICS</div>
+      <h1>Attacking a smart meter over an<br>unauthenticated RF update channel</h1>
+      <p class="lede wide">A training rig that simulates a residential smart meter and the
+        firmware-update-over-radio attack path that can flip it into a fault. We'll walk the whole story:
+        what the technology is, how the real world works, and exactly how one transmission takes a meter down.</p>
+      <div class="hero-panel" aria-hidden="true">
+        <span class="hero-lamp b"></span><span class="hero-lamp g"></span>
+        <span class="hero-lamp y"></span><span class="hero-lamp" id="heroRed"></span>
+      </div>
+      <div class="tags" style="margin-top:8px">
+        <span class="tag">Arduino Opta <b>PLC</b></span><span class="tag">Modbus TCP</span>
+        <span class="tag">LoRa · <b>915 MHz</b> US ISM</span><span class="tag">Raspberry Pi 5</span>
+        <span class="tag"><b>36</b> red teams · 45 kits</span>
+      </div>
+    </section>
+
+    <!-- 2 · WHERE IT FITS -->
+    <section class="slide" data-state="title">
+      <div class="eyebrow">The premise</div>
+      <h2>Where the meter fits in the scenario</h2>
+      <div class="cols lean">
+        <p class="lede" style="max-width:none">Each blue team runs a facility, and the smart meter on their
+          kit is that facility's power. So this little box of lights is not a toy on your desk. It is the power
+          feeding a facility you are responsible for understanding.<br><br>
+          When the scenario attack fires, that power faults, the operators lose their normal way to recover,
+          and the question lands in your lap: <strong class="hl">what happened, and what should they have done
+          about it?</strong></p>
+        <div class="card accent">
+          <h3>What this brief answers</h3>
+          <ul class="clean" style="margin-top:10px">
+            <li>How a radio message becomes a <b>physical consequence</b>.</li>
+            <li>What makes an update channel <b>trustworthy</b>, or not.</li>
+            <li>How an auditor would even <b>see this coming</b>.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="note">The point is understanding: the same meter sits in your blue team's environment, and
+        this is how it can be turned against them.</p>
+    </section>
+
+    <!-- 3 · REAL WORLD AMI -->
+    <section class="slide" data-state="normal">
+      <div class="eyebrow">Grounding it - the real world</div>
+      <h2>How a real smart meter talks</h2>
+      <dl class="deflist">
+        <div style="display:contents" class="first">
+          <dt class="first">To your home</dt>
+          <dd class="first"><span class="k-green">Zigbee</span> - a short-range 2.4 GHz mesh reaching in-home displays and smart thermostats.</dd>
+        </div>
+        <dt>To the utility</dt>
+        <dd>A license-free <span class="k-amber">~900 MHz radio mesh</span>, hopping meter to meter up to a neighborhood collector, then back to the utility.</dd>
+        <dt>For updates</dt>
+        <dd>The utility pushes firmware and configuration <b>over that same radio</b> to millions of meters - the channel that also carries the reading and, on many meters, a <span class="k-red">remote disconnect</span>.</dd>
+      </dl>
+      <div class="card red">
+        <h3>Why that is a soft target</h3>
+        <p>A meter is not just a sensor. It can physically <b>connect or disconnect a home</b>. The radio that
+        manages it reaches enormous scale, and historically the crypto that protects it arrived late and
+        unevenly. An attacker who can speak on that channel is one message away from a physical effect,
+        repeated across a whole neighborhood.</p>
+      </div>
+    </section>
+
+    <!-- 4 · IT vs OT -->
+    <section class="slide" data-state="normal">
+      <div class="eyebrow">A little OT theory</div>
+      <h2>IT protects data. OT moves the physical world.</h2>
+      <div class="cols">
+        <div class="card blue">
+          <h3>What "OT" means</h3>
+          <p><b>Operational Technology</b> is the computing that runs physical processes: meters, valves,
+          motors, breakers. When OT is attacked, the failure is not a leaked file. It is <b>voltage, water, or
+          power</b> doing the wrong thing.</p>
+        </div>
+        <div class="card accent">
+          <h3>Why the rules are different</h3>
+          <p>OT devices live for decades, rarely reboot, and were built for <b>reliability, not
+          authentication</b>. Many field protocols simply trust anyone who can reach them: no login, no
+          signature. That was safe when the wire was locked in a substation. Radio breaks that assumption.</p>
+        </div>
+      </div>
+      <p class="lede wide">So the meter is the perfect teaching target: a real controller, driving a physical
+        output you can watch, speaking the same trusting protocols the real grid runs on.</p>
+    </section>
+
+    <!-- 5 · MEET THE KIT -->
+    <section class="slide" data-state="normal">
+      <div class="eyebrow">Inside the box</div>
+      <h2>Meet the kit - four parts, one meter</h2>
+      <p class="lede wide">Every blue team's kit is the same four components. Two of them are the "meter," two
+        are the "radio." We'll take them one at a time.</p>
+      <div class="cols-3">
+        <div class="card accent"><h3>1 · Opta PLC</h3><p>The industrial controller that <b>is</b> the meter -
+          it runs the simulation and decides healthy vs. faulted.</p></div>
+        <div class="card accent"><h3>2 · Light panel</h3><p>The <b>HMI</b> - four lamps that are the operator's
+          entire view of the meter's health.</p></div>
+        <div class="card accent"><h3>3 · Raspberry Pi 5</h3><p>The <b>communications gateway</b> - it holds the
+          radio and turns a received message into an action on the meter.</p></div>
+        <div class="card accent"><h3>4 · LoRa radio</h3><p>The <b>update channel</b> - a long-range, low-power
+          radio on 915 MHz. Our stand-in for the utility mesh.</p></div>
+        <div class="card"><h3>The idea</h3><p>Meter (1+2) speaks <b>Modbus</b>. Radio (3+4) speaks <b>LoRa</b>.
+          The Pi is where the two worlds meet, and where the attack crosses over.</p></div>
+        <div class="card"><h3>Kit 00</h3><p>One extra "facilitator" kit collects every meter's status over the
+          radio and shows the <b>whole room</b> on a live dashboard.</p></div>
+      </div>
+    </section>
+
+    <!-- 6 · OPTA PLC -->
+    <section class="slide" data-state="normal">
+      <div class="eyebrow">The kit · component 1 of 4</div>
+      <h2>The Arduino Opta - a PLC</h2>
+      <div class="cols lean">
+        <div class="spec">
+          <div class="specrow"><span class="idx">01<small>/04</small></span>
+            <p class="lede" style="max-width:none">A <b>PLC, a Programmable Logic Controller</b>, is the
+            workhorse brain of industrial control. It runs one small, deterministic program in a loop,
+            forever, reading inputs and driving outputs. It is what actually runs factories, water plants, and
+            building systems.</p></div>
+        </div>
+        <div class="card">
+          <h3>Its job in the kit</h3>
+          <p style="margin-bottom:14px">Here the Opta <b>is the smart meter</b>. Its loop simulates voltage
+          and power, decides whether the meter is healthy or faulted, and drives the light panel. It answers
+          questions over the network in <b>Modbus</b>, the industrial protocol.</p>
+          <dl class="kv2">
+            <dt>Role</dt><dd>The meter's controller and decision-maker</dd>
+            <dt>Speaks</dt><dd>Modbus TCP over Ethernet</dd>
+            <dt>Drives</dt><dd>The four-lamp panel, reports voltage and power</dd>
+            <dt>Why it</dt><dd>A real industrial controller, not a hobby board</dd>
+          </dl>
+        </div>
+      </div>
+      <p class="note"><b>Teaching point:</b> the trip logic lives <b>on the PLC</b>. Whether the command
+        arrives by radio or by a direct network write, the controller itself decides to fault, just like real OT.</p>
+    </section>
+
+    <!-- 7 · HMI -->
+    <section class="slide" data-state="normal">
+      <div class="eyebrow">The kit · component 2 of 4</div>
+      <h2>The four-light panel - an HMI</h2>
+      <div class="cols lean">
+        <div class="spec">
+          <div class="specrow"><span class="idx">02<small>/04</small></span>
+            <p class="lede" style="max-width:none">An <b>HMI, a Human-Machine Interface</b>, is how a person
+            sees and commands a physical process. In a control room it is a wall of screens. On our bench it is
+            deliberately stripped to its essence: <b>four indicator lamps</b>. If a light is on, that state is true.</p></div>
+        </div>
+        <div class="card">
+          <h3>What the lights mean</h3>
+          <ul class="clean" style="margin-top:6px">
+            <li><span class="k-blue">Blue</span> and <span class="k-green">green</span> - operator-set, "I'm here and configured."</li>
+            <li><span class="k-amber">Yellow</span> - voltage is up, the dial is past its threshold.</li>
+            <li><span class="k-red">Red</span> - <b>fault.</b> The meter is down.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="note"><b>The whole drama lives here:</b> when the attack lands, blue/green/yellow drop and
+        <b>red comes on, even though the operator's switches are still set.</b> The panel at the top of this
+        deck does the same thing on the attack slides. That gap between "what the operator asked for" and "what
+        the meter is doing" is the attack, made visible.</p>
+    </section>
+
+    <!-- 8 · PI 5 -->
+    <section class="slide" data-state="normal">
+      <div class="eyebrow">The kit · component 3 of 4</div>
+      <h2>The Raspberry Pi 5 - the gateway</h2>
+      <div class="cols lean">
+        <div class="spec">
+          <div class="specrow"><span class="idx">03<small>/04</small></span>
+            <p class="lede" style="max-width:none">A <b>Raspberry Pi 5</b> is a full, general-purpose Linux
+            computer the size of a deck of cards. In the real grid, every meter has a little computer like this
+            bridging the radio network to the meter's internals. Here it plays exactly that role.</p></div>
+        </div>
+        <div class="card">
+          <h3>Its job in the kit</h3>
+          <p style="margin-bottom:14px">The Pi runs a small <b>listener</b> program. It watches the radio, and
+          when a "firmware update" arrives, it does what a gateway does: it <b>applies the update to the
+          meter</b>, translating a radio message into a Modbus command to the PLC.</p>
+          <dl class="kv2">
+            <dt>Role</dt><dd>Bridge between the radio world and the meter</dd>
+            <dt>Runs</dt><dd>The update listener: receive, apply, relay</dd>
+            <dt>Bridges</dt><dd>LoRa radio to Modbus on the Opta</dd>
+            <dt>Real-world</dt><dd>Mirrors the comms module inside a real meter</dd>
+          </dl>
+        </div>
+      </div>
+      <p class="note"><b>This is the crossover point.</b> The attack is delivered by radio, but it only becomes
+        a physical effect because the gateway faithfully "applies" whatever update it receives, no questions asked.</p>
+    </section>
+
+    <!-- 9 · LORA -->
+    <section class="slide" data-state="normal">
+      <div class="eyebrow">The kit · component 4 of 4</div>
+      <h2>The LoRa radio - the update channel</h2>
+      <div class="cols lean">
+        <div class="spec">
+          <div class="specrow"><span class="idx">04<small>/04</small></span>
+            <p class="lede" style="max-width:none"><b>LoRa</b> ("Long Range") is a low-power radio built to
+            send small messages a long way, kilometers, on <b>license-free</b> spectrum. It is the same family
+            of technology behind real utility and smart-city networks. No SIM, no subscription: turn it on and talk.</p></div>
+        </div>
+        <div class="card">
+          <h3>Its job in the kit</h3>
+          <p style="margin-bottom:14px">A LoRa module sits on each Pi, and every meter listens on the same
+          frequency. When the attacker transmits, <b>every radio in range hears it at once</b>. That broadcast
+          nature is exactly what lets one message reach a whole room of meters.</p>
+          <dl class="kv2">
+            <dt>Band</dt><dd>915.125 MHz, US 902-928 MHz ISM (license-free)</dd>
+            <dt>Style</dt><dd>Broadcast, everyone on the channel hears everyone</dd>
+            <dt>Role</dt><dd>Our stand-in for the utility's update mesh</dd>
+            <dt>Reach</dt><dd>Long range, low power, tiny messages</dd>
+          </dl>
+        </div>
+      </div>
+      <p class="note"><b>Why this radio:</b> it is cheap, legal to transmit on, and simple to inject into from a
+        second node, so the attack can be practiced safely while keeping the properties that matter.</p>
+    </section>
+
+    <!-- 10 · MAPPING -->
+    <section class="slide" data-state="normal">
+      <div class="eyebrow">How the bench maps to reality</div>
+      <h2>Our radio here ≈ the utility mesh there</h2>
+      <p class="lede wide">We trade the real radio for one that is safe and easy to work with, but keep the
+        security properties that carry the lesson.</p>
+      <div class="twrap">
+        <table>
+          <thead><tr><th>Element</th><th>Real AMI smart meter</th><th>This lab</th></tr></thead>
+          <tbody>
+            <tr><td class="nm">Update delivery</td><td>Utility pushes firmware over the mesh</td><td>Attacker transmits a "firmware update" over LoRa</td></tr>
+            <tr><td class="nm">The radio</td><td>~900 MHz utility mesh or cellular</td><td><span class="k-amber">915 MHz</span> license-free broadcast</td></tr>
+            <tr><td class="nm">Channel trust</td><td>Varies, often weak or late</td><td><span class="k-red">None, on purpose.</span> The core lesson</td></tr>
+            <tr><td class="nm">Physical result</td><td>Remote disconnect / tamper state</td><td>Meter faults: <span class="k-red">red lamp</span>, zero volts</td></tr>
+            <tr><td class="nm">Recovery</td><td>Utility re-push / field visit</td><td>Manual reset from the "electric company"</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note"><b>What we abstract away:</b> real crypto, a real utility head-end, a real firmware image.
+        <b>What we keep faithful:</b> an unauthenticated channel with a real physical consequence.</p>
+    </section>
+
+    <!-- 11 · MODBUS -->
+    <section class="slide" data-state="normal">
+      <div class="eyebrow">The language the meter speaks</div>
+      <h2>Modbus - the lingua franca of OT</h2>
+      <div class="cols lean">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <p class="lede" style="max-width:none"><b>Modbus</b> is a 45-year-old industrial protocol still
+            running everywhere. Its model is dead simple: a device exposes numbered <b>registers</b> and
+            <b>coils</b> you can read or write. No accounts, no permissions. <b>If you can reach it, you can
+            command it.</b></p>
+          <p class="note">That simplicity is why it is everywhere, and why "reachable" and "authorized" being
+            the same thing is a problem the moment the network is not physically locked down.</p>
+        </div>
+        <div class="twrap">
+          <table>
+            <thead><tr><th>What</th><th>Address</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td class="nm">POWER_STATUS</td><td class="addr">coil 0</td><td>healthy (1) / faulted (0)</td></tr>
+              <tr><td class="nm">VOLTAGE</td><td class="addr">reg 0</td><td>live volts</td></tr>
+              <tr><td class="nm">POWER</td><td class="addr">reg 1</td><td>watts drawn</td></tr>
+              <tr><td class="nm">FW_MODE</td><td class="addr">reg 9</td><td><b>0</b> normal · <b>1+</b> faulted</td></tr>
+              <tr><td class="nm">RESET</td><td class="addr">coil 15</td><td>operator clear</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <p class="note"><b>The one register that matters:</b> <code class="reg">FW_MODE</code>. Normally 0. Push it
+        off 0 and the meter faults. The entire attack is a single write to that number.</p>
+    </section>
+
+    <!-- 12 · MODELING THE FIRMWARE -->
+    <section class="slide" data-state="fault">
+      <div class="eyebrow">A modeling choice worth understanding</div>
+      <h2>The "malicious firmware" is a mode change</h2>
+      <div class="cols">
+        <p class="lede" style="max-width:none">We do not actually reflash the meter. That would be slow,
+          fragile, and impossible to reset dozens of times. Instead, the malicious update flips the
+          <code class="reg">FW_MODE</code> register, and the meter's own logic reacts.<br><br>
+          It is a model, but a <strong class="hl">faithful</strong> one. The teaching point was never "code got
+          rewritten." It was <b>"a message on the update channel changed what the device physically does."</b>
+          That is exactly what happens.</p>
+        <div class="card accent">
+          <h3>Why model it this way</h3>
+          <ul class="clean" style="margin-top:8px">
+            <li><b>Re-runnable</b> - resets in seconds, all day long.</li>
+            <li><b>Faithful</b> - a write into OT still changes the physical output.</li>
+            <li><b>Two doors</b> - because the meter owns the logic, both the radio and a direct network write
+              trigger the same fault.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="note"><b>The payload still looks like firmware</b> - magic bytes, a version, a checksum - so the
+        exercise can teach integrity and supply-chain, not just "a bit got flipped."</p>
+    </section>
+
+    <!-- 13 · ATTACK SURFACE -->
+    <section class="slide" data-state="fault">
+      <div class="eyebrow">The attack surface</div>
+      <h2>The channel checks the message, not the messenger</h2>
+      <div class="cols lean">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <p class="lede" style="max-width:none">The update frame is shaped like real firmware: a magic tag, a
+            version, a type, and a <b>checksum</b> the gateway validates. So the gateway "knows" the message is
+            well-formed.<br><br>
+            But a checksum only proves the bytes were not <b>corrupted</b>, not that they came from someone
+            <b>trusted</b>. There is no signature and no identity on this channel. Anyone can build a perfectly
+            valid update.</p>
+          <div class="term">
+            <div class="top"><i></i><i></i><i></i><span>the attack, in one line</span></div>
+            <pre><span class="c"># craft a valid update and transmit it</span>
+<span class="p">$</span> ./listener.py <span class="o">--send</span> malicious
+<span class="c"># every meter in range faults</span></pre>
+          </div>
+        </div>
+        <div class="card red">
+          <h3>The lesson, in one sentence</h3>
+          <p style="font-size:clamp(15px,2.1vh,19px)">"It passed validation" is not "it is trustworthy."
+          Integrity checks catch <b>accidents</b>. Only authentication catches an <b>adversary</b>, and this
+          channel has none, by design.</p>
+        </div>
+      </div>
+      <p class="note"><b>Kept benign-but-present:</b> normal traffic carries ordinary version heartbeats too, so
+        the lesson is "the channel is unauthenticated," not "any radio traffic is bad."</p>
+    </section>
+
+    <!-- 14 · MESH FLOOD -->
+    <section class="slide" data-state="fault">
+      <div class="eyebrow">Why one shot hits many</div>
+      <h2>One transmission floods the whole mesh</h2>
+      <div class="cols lean">
+        <p class="lede" style="max-width:none">Because LoRa is a broadcast, every meter in earshot hears the
+          update at once. But it goes further: each meter that receives it also <b>rebroadcasts it once</b> to
+          its neighbors, so the update ripples outward hop by hop, reaching meters the attacker could not touch
+          directly.<br><br>
+          This is exactly how a real mesh spreads a legitimate update. The attacker just borrows the same
+          mechanism.</p>
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="card accent">
+            <h3>Two simple rules keep it sane</h3>
+            <ul class="clean" style="margin-top:8px">
+              <li>A message ID means each meter <b>acts once</b>, no endless echo.</li>
+              <li>A hop limit bounds how far it travels.</li>
+            </ul>
+          </div>
+          <p class="note"><b>Same code, any scale:</b> a tight bench is a one-hop flood; a spread-out site is
+            true multi-hop. Nothing new is needed, it is built on the radios already in every kit.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 15 · KILL CHAIN -->
+    <section class="slide" data-state="fault">
+      <div class="eyebrow">The whole attack, one screen</div>
+      <h2>Healthy → deliver → apply → dark</h2>
+      <div class="flow">
+        <div class="node"><span class="t">Start · healthy</span><span class="n">Meter is normal</span>
+          <span class="d">Voltage steady, usage flowing. Blue, green, yellow lit.</span></div>
+        <div class="arrow"><span class="lab">radio</span><span class="g">→</span></div>
+        <div class="node attack"><span class="t">Deliver</span><span class="n">Attacker transmits</span>
+          <span class="d">A valid-looking "firmware update" goes out over LoRa.</span></div>
+        <div class="arrow"><span class="lab">gateway</span><span class="g">→</span></div>
+        <div class="node attack"><span class="t">Apply</span><span class="n">Gateway obeys</span>
+          <span class="d">The Pi applies the update: one Modbus write to the meter.</span></div>
+        <div class="arrow"><span class="lab">physical</span><span class="g">→</span></div>
+        <div class="node attack"><span class="t">Effect · dark</span><span class="n">Meter faults</span>
+          <span class="d">Voltage and usage drop to zero. Red on, everything else off.</span></div>
+      </div>
+      <p class="lede wide" style="margin-top:6px">And it stays dark. The operators reach for their normal
+        recovery, a power reset, and nothing happens. Clearing the fault takes a manual reset from the
+        simulated electric company, or a facilitator stepping in to push it. Losing the ability to recover is
+        the part that stings.</p>
+      <p class="note"><b>Real-world parallel:</b> a malicious update that survives the operator's own recovery
+        forces the utility to intervene. Here, restoring power is the electric company's job, not the operator's.</p>
+    </section>
+
+    <!-- 16 · FLEET VIEW -->
+    <section class="slide" data-state="normal">
+      <div class="eyebrow">Seeing the whole room</div>
+      <h2>Kit 00 - the facilitator's fleet view</h2>
+      <div class="cols lean">
+        <p class="lede" style="max-width:none">One special kit does not play a meter. It <b>listens</b>. Every
+          meter quietly announces its own status over the radio, and Kit 00 gathers them into a single live
+          dashboard: who is healthy, who is dark, and how strong each one's signal is.<br><br>
+          It turns an invisible RF attack into something you can watch unfold across all 36 teams at once.</p>
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="card"><h3>Status beacons</h3><p>Each meter broadcasts a tiny "I am kit N, here is my
+            state" message on a cadence, the raw material for the fleet view.</p></div>
+          <div class="card"><h3>Range map</h3><p>The dashboard reads signal strength on every beacon, doubling
+            as a live map of which kits are in radio reach.</p></div>
+        </div>
+      </div>
+      <p class="note"><b>For the facilitator:</b> this is the god's-eye view during the exercise - call the
+        room's state, prove a flood reached the back row, and confirm recovery in real time.</p>
+    </section>
+
+    <!-- 17 · DASHBOARD SNAPSHOT -->
+    <section class="slide" data-state="fault">
+      <div class="eyebrow">What Kit 00 actually shows</div>
+      <h2>The fleet console, mid-attack</h2>
+      <div class="snapwrap">
+        <div class="snap" aria-label="Fleet status dashboard snapshot">
+          <div class="chrome"><i></i><i></i><i></i><span class="url">kit00.local / fleet</span></div>
+          <div class="body">
+            <div class="head">
+              <div class="dish" aria-hidden="true">📡</div>
+              <div><div class="htitle">Fleet Status · ICS Exercise Console</div>
+                <div class="hsub">Central node · LoRa 915 MHz · ch65</div></div>
+              <div class="listening"><i></i> Listening</div>
+              <div class="clock">14:32:08</div>
+            </div>
+            <div class="sum">
+              <div class="st"><div class="k"><span class="d" style="background:#16a99a"></span>Reporting</div><div class="n">42 / 45</div></div>
+              <div class="st"><div class="k"><span class="d" style="background:#2ba35d"></span>Normal</div><div class="n">34</div></div>
+              <div class="st"><div class="k"><span class="d" style="background:#e14b37"></span>Faulted</div><div class="n">8</div></div>
+              <div class="st"><div class="k"><span class="d" style="background:#7d8c96"></span>Unknown</div><div class="n">3</div></div>
+            </div>
+            <div>
+              <div class="glab">Fleet · node 00 (central) + kits 01-45</div>
+              <div class="fsgrid" id="fsgrid"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="note"><b>Reading it:</b> green is energized, red is faulted, grey is out of contact, and "via
+        mule" is a downed kit heard second-hand from out of range. The attack is visibly rolling across the
+        fleet, one hop at a time.</p>
+    </section>
+
+    <!-- 18 · CLOSING -->
+    <section class="slide" data-state="title">
+      <div class="eyebrow">Why it matters</div>
+      <div class="cols lean" style="align-items:center">
+        <p class="big-quote">Trust the channel, and you hand the switch to <span class="em">anyone with a radio</span>.</p>
+        <div style="display:flex;flex-direction:column;gap:18px">
+          <div class="card accent"><h3>What to take away</h3>
+            <ul class="clean" style="margin-top:8px">
+              <li>Update and management channels are OT attack surface.</li>
+              <li>Integrity is not authenticity - a checksum is not a signature.</li>
+              <li>A logic change in a controller has a <b>physical</b> result.</li>
+              <li>One broadcast can become <b>many</b> victims.</li>
+            </ul>
+          </div>
+          <div class="card blue"><h3>Seeing it is the hard part</h3>
+            <p>In theory a defender watches the air for a rogue update and the meter for an unexpected write. In
+            practice that is a research project: the right radios, captured keys or deep protocol knowledge, a
+            legal tap into the OT network, and a baseline to tell normal from malicious. Most OT shops have none
+            of it. <b>Knowing the attack exists, and being able to advise on it, is the realistic win.</b></p>
+          </div>
+        </div>
+      </div>
+      <p class="note"><b>Bottom line for the OPFOR:</b> you do not need a zero-day. You need a valid checksum
+        and the nerve to hit send. The grid has trusted every polite stranger with a radio for fifty years - so
+        go be a polite stranger.</p>
+    </section>
+
+  </div><!-- /stage -->
+
+  <div class="nav-zone prev" id="zprev" title="Previous"></div>
+  <div class="nav-zone next" id="znext" title="Next"></div>
+
+  <footer class="hint">
+    <span><kbd>←</kbd> <kbd>→</kbd> navigate</span><span class="dot">·</span>
+    <span><kbd>Space</kbd> next</span><span class="dot">·</span>
+    <span><kbd>F</kbd> fullscreen</span><span class="dot">·</span>
+    <span><kbd>Home</kbd>/<kbd>End</kbd> jump</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var i = 0, n = slides.length;
+  var rail = document.getElementById('rail');
+  var curEl = document.getElementById('cur');
+  document.getElementById('tot').textContent = n;
+  var lamps = Array.prototype.slice.call(document.querySelectorAll('#hdrpanel .lamp'));
+  var pstate = document.getElementById('panelState');
+
+  var STATES = {
+    normal: { b:1, g:1, y:1, r:0, label:'STATE: NORMAL' },
+    fault:  { b:0, g:0, y:0, r:1, label:'STATE: FAULTED' },
+    title:  { b:1, g:1, y:1, r:1, label:'PANEL SELF-TEST' }
+  };
+  function setLamps(state) {
+    var s = STATES[state] || STATES.normal;
+    lamps.forEach(function (el) { el.classList.toggle('on', !!s[el.getAttribute('data-l')]); });
+    pstate.textContent = s.label;
+    pstate.style.color = (s.r && !s.g) ? 'var(--red)' : 'var(--ink-dim)';
+  }
+  function show(next) {
+    next = Math.max(0, Math.min(n - 1, next));
+    var outgoing = slides[i];
+    if (outgoing && next !== i) {
+      outgoing.classList.add('leaving');
+      outgoing.classList.remove('active');
+      setTimeout(function(){ outgoing.classList.remove('leaving'); }, 450);
+    }
+    i = next;
+    slides[i].classList.add('active');
+    curEl.textContent = i + 1;
+    rail.style.width = (n <= 1 ? 100 : (i / (n - 1)) * 100) + '%';
+    setLamps(slides[i].getAttribute('data-state'));
+  }
+  function nextS(){ show(i + 1); }
+  function prevS(){ show(i - 1); }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === 'PageDown') { nextS(); e.preventDefault(); }
+    else if (e.key === ' ') { nextS(); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { prevS(); e.preventDefault(); }
+    else if (e.key === 'Home') { show(0); e.preventDefault(); }
+    else if (e.key === 'End') { show(n - 1); e.preventDefault(); }
+    else if (e.key === 'f' || e.key === 'F') {
+      if (!document.fullscreenElement) { document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); }
+      else { document.exitFullscreen && document.exitFullscreen(); }
+    }
+  });
+  document.getElementById('znext').addEventListener('click', nextS);
+  document.getElementById('zprev').addEventListener('click', prevS);
+
+  var root = document.documentElement;
+  document.getElementById('theme').addEventListener('click', function () {
+    var cur = root.getAttribute('data-theme');
+    if (!cur) { cur = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'; }
+    root.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+  });
+
+  // ---- build the fleet-console snapshot ----
+  (function buildSnapshot(){
+    var grid = document.getElementById('fsgrid');
+    if (!grid) return;
+    // representative window of the fleet during an attack: mostly healthy, a faulted cluster,
+    // one carried back via the drone mule, a few out of contact.
+    var K = [
+      { id:0,  st:'central', seen:'live', dbm:'local' },
+      { id:1,  st:'ok',   seen:'3s',  dbm:'-58 dBm' },
+      { id:2,  st:'ok',   seen:'5s',  dbm:'-64 dBm' },
+      { id:3,  st:'crit', seen:'2s',  dbm:'-71 dBm' },
+      { id:4,  st:'crit', seen:'4s',  dbm:'-69 dBm' },
+      { id:5,  st:'ok',   seen:'6s',  dbm:'-60 dBm' },
+      { id:6,  st:'crit', seen:'3s',  dbm:'-77 dBm' },
+      { id:7,  st:'ok',   seen:'8s',  dbm:'-66 dBm' },
+      { id:8,  st:'unk',  seen:'--',  dbm:'no signal' },
+      { id:9,  st:'ok',   seen:'5s',  dbm:'-73 dBm' },
+      { id:10, st:'mule', seen:'11s', dbm:'via mule' },
+      { id:11, st:'ok',   seen:'4s',  dbm:'-62 dBm' },
+      { id:12, st:'crit', seen:'2s',  dbm:'-80 dBm' },
+      { id:13, st:'ok',   seen:'7s',  dbm:'-68 dBm' },
+      { id:14, st:'unk',  seen:'--',  dbm:'no signal' },
+      { id:15, st:'ok',   seen:'3s',  dbm:'-59 dBm' },
+      { id:16, st:'crit', seen:'5s',  dbm:'-74 dBm' },
+      { id:17, st:'ok',   seen:'6s',  dbm:'-70 dBm' },
+      { id:18, st:'crit', seen:'4s',  dbm:'-76 dBm' },
+      { id:19, st:'ok',   seen:'9s',  dbm:'-65 dBm' },
+      { id:20, st:'crit', seen:'3s',  dbm:'-72 dBm' }
+    ];
+    var META = {
+      central:{ cls:'fs-central', pill:'Central', bars:0 },
+      ok:     { cls:'fs-ok',      pill:'Normal',  bars:function(d){ return barsFor(d); } },
+      crit:   { cls:'fs-crit',    pill:'Faulted', bars:function(d){ return barsFor(d); } },
+      mule:   { cls:'fs-crit',    pill:'Faulted', bars:2 },
+      unk:    { cls:'fs-unk',     pill:'Unknown', bars:0 }
+    };
+    function barsFor(dbm){ var v = parseInt(dbm,10); if (isNaN(v)) return 0; return v>=-60?4 : v>=-75?3 : v>=-90?2 : 1; }
+    function barHtml(lit){ var s=''; for (var b=0;b<4;b++){ s += '<i class="'+(b<lit?'lit':'')+'"></i>'; } return s; }
+    grid.innerHTML = K.map(function(k){
+      var m = META[k.st];
+      var lit = typeof m.bars === 'function' ? m.bars(k.dbm) : m.bars;
+      return '<div class="fskit '+m.cls+(k.st==='central'?' central':'')+'">'
+        + '<div class="r1"><span class="kid">K'+String(k.id).padStart(2,'0')+'</span><span class="seen">'+k.seen+'</span></div>'
+        + '<span class="fspill">'+m.pill+'</span>'
+        + '<div class="r3"><span class="fsbars">'+barHtml(lit)+'</span><span class="fsdbm">'+k.dbm+'</span></div>'
+        + '</div>';
+    }).join('');
+  })();
+
+  show(0);
+})();
+</script>
+
+</body>
+</html>
