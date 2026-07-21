@@ -65,7 +65,7 @@ use a reserved internal-flash sector via `FlashIAP`, bench-tested first.)
 
 - `opta/`     — Opta smart-meter Arduino sketch (`smart_meter/`) + prebuilt firmware (`firmware/`) + factory backup (`backup/`)
 - `listener/` — field-kit Pi service: LoRa (serial) -> Modbus write; also **beacons kit status**
-- `central/` — facilitator **fleet console**: `collector.py` (aggregates status beacons + local Kit 00 meter) + `fleet.html` live dashboard + `smartmeter-collector.service`
+- `central/` — facilitator **fleet console**: `collector.py` (aggregates status beacons + local Kit 00 meter) + `fleet.html` live dashboard + `smartmeter-collector.service`. Optional **USB 4-key macropad -> RF trigger**: `keypad.py` (evdev; `--learn` to bind keys, then POSTs to the collector's `/api/send`) + `smartmeter-keypad.service`; install via `provision/keypad_service.sh`
 - `drone/`    — RF injection experiments (`beacon/` dead end, `rxsweep/` diagnostic — see `drone/README.md`)
 - `provision/`— per-kit build: `provision.sh` (build one kit), `hat_config.py`, `opta_flash.sh`, `patch_ip.py`, `authorized_keys`
 - `scripts/`  — test/helper scripts (Modbus poll, trip inject, reset)

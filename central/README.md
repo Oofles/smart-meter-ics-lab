@@ -76,6 +76,33 @@ sudo systemctl enable --now smartmeter-collector
 journalctl -u smartmeter-collector -f          # watch beacons land
 ```
 
+## USB macropad -> RF trigger (optional)
+
+`keypad.py` turns a plugged-in 4-key USB macropad into a physical shortcut for the
+dashboard's send button. It reads the pad with `evdev` and, on each keypress, POSTs to the
+**local** collector's `/api/send` — so it reuses the collector's radio (no `/dev/ttyAMA0`
+contention) and does exactly what clicking send in `fleet.html` does: broadcast over LoRa +
+trip Kit 00's own Opta.
+
+```
+[pad key] --evdev--> keypad.py --POST /api/send--> collector --LoRa--> mesh
+```
+
+One-time bind (auto-discovers device + keycode — just press the key for each action):
+
+```bash
+sudo provision/keypad_service.sh          # python3-evdev + `input` group + install unit
+sudo python3 central/keypad.py --learn    # press a key for: TEST / LOCK / reset / heartbeat
+sudo systemctl enable --now smartmeter-keypad
+journalctl -u smartmeter-keypad -f        # watch keypresses fire
+```
+
+The mapping saves to `/etc/smartmeter-keypad.json` (stable `by-id` device path). Runtime
+**grabs** the pad exclusively so keystrokes don't leak to a console, and a per-action
+cooldown (`--cooldown`, default 1.5 s) stops a bounce double-firing the payload. Rebind any
+time with `--learn`, then `systemctl restart smartmeter-keypad`. `keypad.py --list` shows
+input devices. Needs the collector running (it's the POST target).
+
 ## Status / TODO
 
 - [x] Status beacon (`protocol.SMST`) + field-kit beaconing (`listener.py`, auto kit-id from `--host`).
@@ -88,4 +115,6 @@ journalctl -u smartmeter-collector -f          # watch beacons land
   node (`.100`); survives reboot, RX lines live in `journalctl`.
 - [x] **Drone mule** — `scripts/datamule.py`: the drone buffers out-of-range kits' `SMST`
   beacons and re-emits them (version=2) so the collector resolves them as **"via mule"**.
-- [ ] Fold the central-node setup (HAT `--rssi`, this service) into provisioning.
+- [x] **USB macropad -> RF trigger** — `keypad.py` (`--learn` binds keys) + `smartmeter-keypad.service`
+  + `provision/keypad_service.sh`. Each key POSTs to `/api/send`. Code written; needs a pad to bench-test.
+- [ ] Fold the central-node setup (HAT `--rssi`, this service, keypad) into provisioning.

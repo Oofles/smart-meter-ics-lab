@@ -1,0 +1,22 @@
+[Unit]
+# Central-node USB macropad -> facilitator RF trigger. Each key POSTs to the local
+# collector's /api/send (http://127.0.0.1:8090), which broadcasts the payload over LoRa
+# and applies it to Kit 00's own Opta. A physical shortcut for the dashboard send button.
+# Requires the mapping from `keypad.py --learn` at /etc/smartmeter-keypad.json, the
+# collector running (smartmeter-collector.service), python3-evdev, and the service user
+# in the `input` group (provision/keypad_service.sh does all of this).
+Description=Smart-meter facilitator keypad (central node: macropad -> RF send)
+After=network-online.target smartmeter-collector.service
+Wants=smartmeter-collector.service
+
+[Service]
+User=vivicat
+SupplementaryGroups=input
+WorkingDirectory=/home/vivicat/smart-meter-ics-lab
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /home/vivicat/smart-meter-ics-lab/central/keypad.py --config /etc/smartmeter-keypad.json
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
