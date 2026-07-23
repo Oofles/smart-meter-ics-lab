@@ -29,9 +29,11 @@ code.
 | `docs/`      | `register-map.md` (the contract), `architecture.md`              |
 | `CLAUDE.md`  | Claude Code project memory                                       |
 | `PLAN.md`    | Phased implementation plan                                       |
+| `BOM.md`     | Bill of materials — what to buy to build your own                |
 
 ## Start here
 
+0. Building your own? `BOM.md` lists the hardware (and what's substitutable).
 1. Read `docs/register-map.md` — the Modbus contract everything builds against.
 2. Follow `PLAN.md` phase by phase (Opta first; nothing validates until it serves Modbus).
 3. `CLAUDE.md` carries the context and gotchas into each Claude Code session.
