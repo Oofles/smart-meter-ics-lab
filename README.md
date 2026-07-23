@@ -41,10 +41,13 @@ code.
 ## Data flow
 
 ```
-[drone / 2nd LoRa node] ----RF payload----> [Pi: update listener]
-                                                     | writes FW_MODE (Modbus)
-                                                     v
-[Opta: smart-meter sim + Modbus TCP] ----> physical 4-light panel (operator view)
-      drives POWER_STATUS/VOLTAGE/POWER_W
-      field kits also beacon status over RF ----> [Kit 00: collector + dashboard]
+[drone / 2nd LoRa node]
+    |
+    |  RF payload (LoRa)
+    v
+[Pi: update listener] --writes FW_MODE (Modbus)--> [Opta: smart-meter sim + Modbus TCP]
+    |                                                  |
+    |  beacons kit status (RF)                         |  drives POWER_STATUS / VOLTAGE / POWER_W
+    v                                                  v
+[Kit 00: collector + fleet dashboard]              [physical 4-light panel (operator view)]
 ```
